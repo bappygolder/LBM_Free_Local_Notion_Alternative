@@ -248,10 +248,37 @@ window.MCCProjectData = {
         source: "recommended",
         recommendedBy: "Codex (GPT-5)",
         references: []
+      },
+      {
+        id: "LBM-001",
+        title: "Design the OBM Freemium SaaS Architecture",
+        notes: "Brainstorm cloud syncing strategies and gamified business structure for the online-tier SaaS version.",
+        lane: "backlog",
+        priority: "P3",
+        area: "product",
+        source: "user-requested",
+        recommendedBy: "Vision Roadmap",
+        references: ["docs/VISION_AND_PHILOSOPHY.md"]
+      },
+      {
+        id: "LBM-002",
+        title: "Draft 'Business in a Box' onboarding questionnaire",
+        notes: "Draft the set of questions required from users so the system can dynamically render their business plan and task board.",
+        lane: "backlog",
+        priority: "P2",
+        area: "product",
+        source: "user-requested",
+        recommendedBy: "Vision Roadmap",
+        references: ["docs/VISION_AND_PHILOSOPHY.md"]
       }
     ]
   },
   docs: [
+    {
+      title: "Vision and Philosophy",
+      summary: "The overarching vision, three-tier rollout strategy (LBM/OBM/Agency), and the AI-in-a-box philosophy.",
+      path: "docs/VISION_AND_PHILOSOPHY.md"
+    },
     {
       title: "Persistence and State",
       summary: "What data lives where: localStorage, seed data, and sync behaviour.",
