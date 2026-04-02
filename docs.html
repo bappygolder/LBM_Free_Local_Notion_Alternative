@@ -45,6 +45,47 @@
         <a class="tab active" href="docs.html">Docs</a>
         <a class="tab" href="resources.html">Resources</a>
       </nav>
+      <div class="header-right">
+        <div class="app-menu-wrap" id="appMenuWrap">
+          <button class="app-menu-btn" id="appMenuBtn" type="button"
+            title="More options" aria-label="More options" aria-expanded="false" aria-haspopup="menu">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+            </svg>
+          </button>
+          <div class="app-menu-dropdown" id="appMenuDropdown" hidden role="menu">
+            <button class="app-menu-item app-menu-item--danger" id="menuResetApp" role="menuitem">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                <path d="M10 11v6"/><path d="M14 11v6"/>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+              Reset app
+            </button>
+            <div class="app-menu-sep" role="separator"></div>
+            <button class="app-menu-item app-menu-advanced-header" id="menuAdvancedToggle"
+              type="button" aria-expanded="false" aria-controls="advancedPanel">
+              <svg class="advanced-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+              Advanced
+            </button>
+            <div class="app-menu-advanced-panel" id="advancedPanel" hidden>
+              <label class="app-menu-toggle-row" id="skipResetRow">
+                <span class="app-menu-toggle-label">Skip reset confirmation</span>
+                <span class="app-toggle-switch" id="skipResetToggle" role="switch"
+                  aria-checked="false" tabindex="0" aria-label="Skip reset confirmation">
+                  <span class="app-toggle-thumb"></span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -189,6 +230,28 @@
       <div class="modal-footer">
         <button class="ghost" id="cancelAddDocBtn" type="button">Cancel</button>
         <button class="primary" id="saveDocBtn" type="button">Save Document</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Reset app confirmation modal ────────────────────────────────────────── -->
+  <div class="reset-app-overlay" id="resetAppOverlay" hidden role="dialog"
+    aria-modal="true" aria-labelledby="resetAppTitle">
+    <div class="reset-app-dialog">
+      <div class="reset-app-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <div class="reset-app-header">
+        <h2 class="reset-app-title" id="resetAppTitle">Reset app?</h2>
+        <p class="reset-app-sub">This will permanently delete all tasks, settings, and data. You'll start fresh with the default seed tasks. <strong>This cannot be undone.</strong></p>
+      </div>
+      <div class="reset-app-actions">
+        <button class="ghost" id="resetAppCancelBtn" type="button">Cancel</button>
+        <button class="danger" id="resetAppConfirmBtn" type="button">Reset Everything</button>
       </div>
     </div>
   </div>

@@ -282,8 +282,112 @@ Rules:
 - Close on Escape and backdrop click — already implemented.
 - **Focus trap required**: keyboard tab must cycle through modal elements only, not reach content behind the modal. Currently not implemented — flag as a Tier 1 gap for modals that contain forms.
 - Animation: scale `0.97→1` + opacity `0→1`, 200ms ease — already correct.
+- Width: `min(360px, 100%)` for small confirmation dialogs. Standard content modals use `min(480px, 100%)`.
+- Padding: `24px 24px 20px`. Radius: `--radius-lg` (14px).
 
-### 6g. Dropdown and Popover Menus
+### 6g. Destructive Confirmation Dialog
+
+Use this pattern whenever an action is irreversible (reset, delete all, permanent removal). **Do not use a standard modal for destructive actions** — this pattern is distinct by design.
+
+**Structure** (top to bottom):
+1. **Warning icon** — 40×40px rounded square (`--radius-md`), `--danger-soft` background, `--danger` stroke. SVG: triangle warning, `stroke-width: 2`, `stroke-linecap: round`.
+2. **Header block** — title (`--text-md`, weight 700) + subtitle (`--text-sm`, `--muted`, `line-height: 1.55`). Highlight the key word in the subtitle using `<strong>` styled to `--danger`.
+3. **Confirmation input** — when the action is extreme (e.g. reset all data), require the user to type a word before the confirm button enables. Input style: `height: 34px`, `--border-strong`, `rgba(255,255,255,0.04)` background. Focus state: `--danger` border + `rgba(239,68,68,0.1)` shadow.
+4. **Actions row** — `display: flex; justify-content: center; gap: 8px`. Always centered. `padding-top: 16px`, `border-top: 1px solid var(--border)`. Never use `justify-content: flex-end` — buttons must be centered.
+5. **"Don't ask again" row** (optional, always below buttons) — `display: flex; flex-direction: row-reverse; justify-content: center; align-items: center; gap: 8px; padding-top: 4px`. Label text on the left, checkbox on the right, entire row centered. Checkbox must use `box-sizing: content-box` with explicit `width`/`height` to stay perfectly square — the global `box-sizing: border-box` reset would otherwise shrink the content area.
+
+**Button labels**: Use title case — "Cancel" and "Reset Everything", not "reset everything". The destructive button uses `.danger` class.
+
+**HTML skeleton:**
+```html
+<div class="reset-app-overlay" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+  <div class="reset-app-dialog">
+    <div class="reset-app-icon" aria-hidden="true"><!-- warning SVG --></div>
+    <div class="reset-app-header">
+      <h2 class="reset-app-title" id="dialogTitle">Reset app?</h2>
+      <p class="reset-app-sub">…Type <strong>reset</strong> to confirm.</p>
+    </div>
+    <!-- optional: confirmation input -->
+    <div class="reset-app-actions">
+      <button class="ghost" type="button">Cancel</button>
+      <button class="danger" type="button" disabled>Reset Everything</button>
+    </div>
+  </div>
+</div>
+```
+
+**Rules:**
+- Always require explicit confirmation (either a confirmation input or a second deliberate click) before executing.
+- The confirm button starts `disabled` when a confirmation input is present. Enable it only when the typed value matches exactly.
+- Reuse `.reset-app-overlay`, `.reset-app-dialog`, and `.reset-app-actions` CSS classes — do not re-invent this pattern.
+- Use the same modal on every page that can trigger the action (index.html, docs.html, resources.html).
+
+### 6h. Toasts and Banners
+
+Two distinct notification tiers exist in LBM. Never mix their patterns.
+
+#### Tier 1 — Transient Toast (`.undo-toast`)
+
+For **informational** feedback that requires no action. Auto-dismisses after ~2.5s.
+
+- Position: `fixed`, `bottom: 28px`, horizontally centered via `left: 50%; transform: translateX(-50%)`
+- Shape: rounded rectangle (`--radius-md`, not pill)
+- Background: `--surface-solid`, border: `--border-strong`
+- Text: `--text`, `0.84rem`, weight 500
+- No interactive elements. `pointer-events: none` while hidden.
+- Animation: `translateY(6px) → 0` + opacity, 200ms `ease`
+- z-index: 9999
+
+Use for: "Deleted — Cmd+Z to undo", brief confirmations, keyboard shortcut hints.
+
+#### Tier 2 — Persistent Action Banner (`.reset-undo-banner`)
+
+For **recoverable actions** where the user may want to reverse something. Stays until dismissed or timed out.
+
+- Position: `fixed`, `bottom: 24px`, horizontally centered
+- Shape: pill (`border-radius: 20px`)
+- Background: `--surface-overlay`, border: `--border-strong`
+- Height: `40px`, padding: `0 6px 0 14px`
+- Contains: message (`--muted`, `0.8125rem`) + Undo button + dismiss (×) button
+- Animation: `translateY(16px) → 0` + opacity, 200ms decelerate easing
+- z-index: 600
+
+**Undo button** (`.reset-undo-btn`): `height: 26px`, pill shape, accent-tinted (`--accent-light` text, `--accent-xsoft` background, `rgba(139,92,246,0.25)` border).
+
+**Dismiss button** (`.reset-undo-dismiss`): 28×28px circle, icon-only (×). **Must set `padding: 0`** — the global `button` rule applies `padding: 7px 14px` which collapses a fixed-size button's content area to zero under `box-sizing: border-box`, hiding the SVG icon. This is the canonical pattern for all fixed-size icon-only buttons.
+
+Use for: post-reset undo, post-bulk-delete undo, any destructive action that can be reversed within a session.
+
+#### Choosing between the two
+
+| Scenario | Use |
+|---|---|
+| No action possible, just informing the user | Transient toast |
+| User can undo or take a recovery action | Persistent banner |
+| Success after a form save | Transient toast |
+| Destructive operation just completed | Persistent banner |
+
+### 6i. Fixed-Size Icon Buttons — Required Rule
+
+Any button that has an explicit `width` and `height` (i.e. it is sized as a fixed square or circle) **must** set `padding: 0` in its CSS rule.
+
+**Why:** The global `button` reset applies `padding: 7px 14px`. With `box-sizing: border-box` (applied globally), padding is included inside the declared width. A 28px button with 14px left + 14px right padding has a 0px content box — any SVG icon inside will be invisible.
+
+```css
+/* Correct */
+.my-icon-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0; /* ← required */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+```
+
+This applies to: `.reset-undo-dismiss`, all `.icon-button` instances, toolbar icon buttons, close buttons on panels, and any future icon-only circular or square buttons.
+
+### 6j. Dropdown and Popover Menus
 
 Based on shadcn/Radix patterns:
 - Entry animation: `translateY(4px) → translateY(0)` + opacity, 120ms ease-out.
@@ -442,17 +546,19 @@ Work through this list gradually across sessions. Do not fix everything at once.
 - [ ] Fix `var(--text-2)` undefined variable in `.shortcuts-fab` → `var(--muted)` *(already done in styles.css)*
 - [ ] Add `role="dialog"`, `aria-modal="true"`, `aria-labelledby` to the delete confirm overlay
 - [ ] Audit all icon-only buttons for `aria-label` presence
+- [ ] Audit all fixed-size icon-only buttons for `padding: 0` (see §6i) — hidden SVG icons are the symptom of this missing rule
 
 ### Tier 2 — Important (design consistency)
 
 - [ ] Replace hardcoded `#13141f` with `var(--surface-deep)` in detail panel styles
-- [ ] Replace hardcoded `#1c1d28` with `var(--surface-overlay)` in shortcuts panel styles
+- [ ] Replace hardcoded `#1c1d28` with `var(--surface-overlay)` in shortcuts panel and `.reset-undo-banner` styles
 - [ ] Replace hardcoded `#c4b5fd` with `var(--accent-light)` in `.markdown-view h3`
 - [ ] Replace `#e2e8f0`, `#d4d4d8` text colors with `var(--text-secondary)`
 - [ ] Begin migrating font sizes to the 8-step type scale (start with new code, migrate old gradually)
 - [ ] Begin using spacing tokens (`--space-*`) in new CSS rules
 - [ ] Replace hardcoded `border-radius: 4px` values with `var(--radius-xs)`
 - [ ] Fix known spacing violations (11px → 12px, 7px → 8px, etc.)
+- [ ] Ensure all button labels in dialogs use title case ("Reset Everything", not "reset everything")
 
 ### Tier 3 — Polish (nice-to-have)
 

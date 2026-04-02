@@ -36,6 +36,7 @@ The Local Business Manager has two persistence layers. Understanding them preven
 
 - All tasks created or edited in the browser UI after the initial load
 - UI preferences: collapsed board columns (`ui.collapsedColumns`), list sort (`ui.listSort`)
+- Custom property names (`ui.propLabels`) — renamed labels for Urgency, Value, Area, etc.
 - Confirm-dialog preferences (e.g. `lbm_skipDeleteConfirm`)
 - The editable project title (if changed via the header)
 

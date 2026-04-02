@@ -1,74 +1,119 @@
 # Setup Guide
 
-This guide gets you from zero to a working Local Business Manager installation in under five minutes — no command line required.
+This guide gets you from zero to a working Local Business Manager in under two minutes. Choose the path that fits you best.
 
 ---
 
-## Prerequisites
+## What You Need
 
-- A modern web browser (Chrome, Firefox, Safari, or Edge)
-- A text editor if you want to customise the project name or seed tasks (VS Code, Notepad, TextEdit — anything works)
+Just a web browser — Chrome, Firefox, Safari, or Edge. That is it.
 
-That is it. No Node.js, no npm, no installation.
+No Node.js. No npm. No installation. No sign-up.
 
 ---
 
-## Step 1 — Get the Files
+## Drop LBM into Any Project
 
-**Option A: Copy the folder**
-Copy the entire `1_LBM_Local_Business_Manager/` folder into your own project directory or anywhere on your computer.
+LBM is a self-contained folder. No build step, no dependencies, no accounts.
 
-**Option B: Clone from Git**
+**To use it for a new project:**
+
+1. Copy the entire `1_LBM_Local_Business_Manager` folder into your project (or anywhere on your computer)
+2. Open `data/project-data.js` in any text editor and set your `name`, `fullName`, and `maintainedBy` fields
+3. Open `index.html` in your browser
+4. Click the **ⓘ** icon in the header and choose **Reset to Seed**
+
+That's it. Your tracker is now configured for your project, seeded with your own tasks, and ready to use.
+
+> **Why reset?** If you copy LBM into a new project, your browser may still have task data from the previous project saved in `localStorage`. Resetting clears that and loads cleanly from your updated seed file. An undo banner appears immediately so you can reverse it within the same session if needed.
+
+---
+
+## Installation
+
+### If You Are Not a Developer
+
+**Step 1 — Download the project**
+
+Go to the GitHub page for this project. Click the green **Code** button, then click **Download ZIP**.
+
+> If someone sent you a folder or zip file directly, skip to Step 2.
+
+**Step 2 — Unzip the folder**
+
+Find the downloaded file in your `Downloads` folder. Double-click it to unzip. You will get a folder called `1_LBM_Local_Business_Manager`.
+
+Move it anywhere you like — your Desktop, Documents, wherever is convenient.
+
+**Step 3 — Open the app**
+
+Open the folder. Find the file called `index.html`. Double-click it.
+
+```
+📁 1_LBM_Local_Business_Manager
+    └── 📄 index.html  ← double-click this
+```
+
+Your browser will open and the app loads immediately. You will see sample tasks already in place so you can explore right away.
+
+**Done.** Nothing else to install.
+
+---
+
+### If You Are a Developer
+
 ```bash
 git clone <repo-url>
+cd 1_LBM_Local_Business_Manager
+open index.html
 ```
 
-**Option C: Download as ZIP**
-Download the repository as a ZIP file from GitHub and extract it anywhere.
+To avoid CORS issues with the Docs tab, serve locally:
+
+```bash
+python3 -m http.server 8080
+# Open http://localhost:8080
+```
 
 ---
 
-## Step 2 — Open the App
+## The Docs Tab
 
-Navigate into the folder and double-click `index.html` to open it in your browser.
+The **Docs** tab in the navigation header opens a documentation viewer with all the built-in guides.
 
-```
-1_LBM_Local_Business_Manager/
-└── index.html   ← open this
-```
-
-The app loads instantly with sample tasks already populated so you can see how it works.
-
-> **Tip:** If doc files in the Docs tab fail to load, serve the folder with a local server instead:
+> **If the Docs tab shows blank or broken content**, your browser is blocking local file reads. This is a browser security rule, not a bug in the app.
+>
+> **Fix:** Open a Terminal window, navigate into the folder, and run:
 > ```bash
-> cd 1_LBM_Local_Business_Manager
 > python3 -m http.server 8080
 > ```
-> Then open `http://localhost:8080` in your browser.
+> Then open `http://localhost:8080` in your browser. The Docs tab will work correctly.
+>
+> You only need to do this if you use the Docs tab. The task tracker itself works fine when opened directly.
 
 ---
 
-## Step 3 — Customise the Project Name
+## Customise the Project Name
 
-Open `data/project-data.js` in a text editor and update the top section:
+Open `data/project-data.js` in any text editor (Notepad, TextEdit, VS Code — anything works).
+
+Find this section near the top and update it:
 
 ```js
-window.MCCProjectData = {
-  project: {
-    name: "LBM",                        // ← short name shown in the header
-    fullName: "Local Business Manager", // ← full name for display
-    maintainedBy: "Your Name",
-    ...
-  },
+project: {
+  name: "LBM",                        // ← short name in the header
+  fullName: "Local Business Manager", // ← full name for display
+  maintainedBy: "Your Name",          // ← your name
+},
 ```
 
-Save the file and refresh your browser. The header title updates immediately.
+Save the file and refresh your browser. The header updates immediately.
 
 ---
 
-## Step 4 — Define Your Working Areas
+## Customise Your Working Areas
 
-Still in `data/project-data.js`, find the `areas` array and replace the defaults with your own categories:
+Still in `data/project-data.js`, find the `areas` array and replace it with your own categories:
 
 ```js
 areas: [
@@ -79,66 +124,72 @@ areas: [
 ],
 ```
 
-These areas appear as filter options in the task list.
+These appear as filter options in the task list.
 
 ---
 
-## Step 5 — Set Your Seed Tasks
+## Rename Property Labels
 
-The `tasks` array in `data/project-data.js` contains the default tasks loaded when someone opens the app for the first time (or after a reset).
+Property names like **Urgency**, **Value**, and **Area** can be renamed to match your workflow — no code editing required.
 
-Replace the sample tasks with your own starting backlog, or clear the array entirely for a blank slate:
+Click any property label in the task detail panel — it becomes editable inline. Type your new name and press Enter. The change saves automatically and updates everywhere: the Sort menu, the Settings panel, and the detail panel itself.
+
+Your custom labels are stored in your browser and persist across sessions.
+
+---
+
+## Set Your Starting Tasks
+
+The `tasks` array in `data/project-data.js` contains the default tasks loaded when someone opens the app for the first time.
+
+Replace the sample tasks with your own backlog, or clear it for a blank start:
 
 ```js
 tasks: []
 ```
 
-> **What is seed data?** Seed tasks are the git-committed baseline. Tasks you create in the browser UI are saved to `localStorage` and are personal to that browser. See [Persistence and State](PERSISTENCE_AND_STATE.md) for the full explanation.
+> **What is seed data?** Seed tasks are the git-committed baseline. Tasks you create in the browser are saved to `localStorage` and stay personal to that browser. See [Persistence and State](PERSISTENCE_AND_STATE.md) for the full explanation.
 
 ---
 
-## Step 6 — Open the Docs Tab
+## Backing Up Your Tasks
 
-Click the **Docs** tab in the header navigation to read the included guides:
+Your tasks are saved automatically in your browser. To export them as a file:
 
-- **Vision and Philosophy** — the "why" behind the project
-- **Persistence and State** — where your data lives
-- **Keyboard Shortcuts** — power-user shortcuts for navigating the app
-- **Local Project System** — how to keep tasks and docs in sync with your codebase
+1. Click the **ⓘ** (info) icon in the app header
+2. Choose **Export JSON** or **Export Markdown**
+
+Keep this file somewhere safe if you want a permanent record.
 
 ---
 
-## Resetting to Seed Data
+## Starting Fresh / Reset to Seed
 
-If you want to wipe your browser's local changes and start fresh from the seed data:
+To wipe your browser's local changes and go back to the seed data:
 
 1. Click the **ⓘ** (info) icon in the app header
 2. Click **Reset to Seed**
 
 This restores all tasks to the values in `data/project-data.js`.
 
----
+**You will not lose your work without a chance to recover it.** An undo banner appears immediately after the reset. Click it to restore your previous state — it remains available until you navigate away or close the tab.
 
-## Exporting Your Tasks
-
-To back up or share your current task list:
-
-1. Open the **ⓘ** info panel
-2. Click **Export JSON** or **Export Markdown**
-
-The exported file includes all tasks in your current browser session.
+This makes reset safe to use confidently:
+- Starting a new project with LBM? Reset after editing `project-data.js` — your custom seed loads cleanly.
+- Shared the folder with a new team member? They open it fresh and get the seed data automatically.
+- Want a clean slate for a new sprint? Reset, then the seed is your new baseline.
 
 ---
 
-## Handing Off to a New User
+## Giving It to Someone Else
 
-When giving this app to someone else:
+LBM is designed to be handed off with zero friction:
 
-1. Make sure `data/project-data.js` has the correct seed tasks and areas committed to git
-2. Tell them to open `index.html` in their browser
-3. Point them to this guide and the [Docs tab](../docs.html) for further reading
+1. Make sure `data/project-data.js` has the right seed tasks and areas committed to git
+2. Zip the folder and send it (or share the GitHub link)
+3. They open `index.html` — done immediately
 
-New users always start from the seed data the first time they open the app in their browser.
+New users always start from the seed data the first time they open the app.
 
 ---
 
@@ -146,7 +197,8 @@ New users always start from the seed data the first time they open the app in th
 
 | Problem | Fix |
 |---|---|
-| Docs tab shows empty or broken content | Serve with `python3 -m http.server 8080` instead of opening the file directly |
-| My tasks disappeared | Check if you opened the file in a different browser or cleared browser data. Tasks live in `localStorage`. |
-| Header shows wrong project name | Update `data/project-data.js` and refresh |
-| I want to start fresh | Use the **Reset to Seed** button in the ⓘ info panel |
+| **Docs tab is blank or broken** | Serve with `python3 -m http.server 8080` and visit `http://localhost:8080` |
+| **My tasks disappeared** | Tasks live in `localStorage`. Check you're using the same browser and haven't cleared browsing data. |
+| **The header shows the wrong name** | Update `data/project-data.js` and refresh |
+| **I want to start over** | Click **ⓘ** in the header and choose **Reset to Seed** |
+| **I opened it in the wrong browser** | Tasks are browser-specific — open `index.html` in the same browser you used before |

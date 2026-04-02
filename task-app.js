@@ -79,11 +79,27 @@
   let colDragKey        = null; // column key being dragged for reorder
   let colDropInsertIdx  = null; // insertion index during column drag (0 = before first)
 
+  // Multi-select state
+  let selectedTaskIds  = new Set(); // task IDs currently selected via lasso drag
+  let lassoActive      = false;
+  let lassoStart       = { x: 0, y: 0 };
+  let lassoEl          = null; // the rubber-band rect element
+  let listDragMultiIds = []; // ordered IDs being dragged together in list view
+
   // Detail panel view mode: "side" | "center" | "full"
   let detailMode = "side";
 
-  // List view sort: "urgency" | "value" | "modified" | "manual"
-  let listSort = "urgency";
+  // List view sort: "criteria" | "manual"
+  let listSort = "manual";
+
+  // Multi-level sort criteria order (all three always active, in priority order)
+  let sortCriteriaOrder = ["urgency", "value", "modified"];
+
+  // Sort direction per criterion: "desc" = high/newest first, "asc" = low/oldest first
+  let sortDirs = { urgency: "desc", value: "desc", modified: "desc" };
+
+  // Which criterion's direction sub-row is currently expanded in the sort panel
+  let sortExpandedKey = null;
 
   // Manual sort order for list view — array of task IDs (active tasks only)
   let listManualOrder = [];
@@ -230,6 +246,7 @@
     taskSource:         document.getElementById("taskSource"),
     taskNotes:          document.getElementById("taskNotes"),
     submitButton:       document.getElementById("submitButton"),
+    voiceMicBtn:        document.getElementById("voiceMicBtn"),
     cancelEditButton:   document.getElementById("cancelEditButton"),
 
     // Shortcuts panel
@@ -238,7 +255,24 @@
     shortcutsPanelClose: document.getElementById("shortcutsPanelClose"),
 
     // Click-guard backdrop (shown while any toolbar panel is open)
-    panelBackdrop:       document.getElementById("panelBackdrop")
+    panelBackdrop:       document.getElementById("panelBackdrop"),
+
+    // App menu — page-specific items only (toggle + reset handled by header.js)
+    appMenuBtn:          document.getElementById("appMenuBtn"),
+    appMenuDropdown:     document.getElementById("appMenuDropdown"),
+    menuAppInfo:         document.getElementById("menuAppInfo"),
+    menuExportJson:      document.getElementById("menuExportJson"),
+    menuExportMarkdown:  document.getElementById("menuExportMarkdown"),
+    menuResetSeed:       document.getElementById("menuResetSeed"),
+
+    // Reset app modal (controlled by header.js)
+    resetAppOverlay:     document.getElementById("resetAppOverlay"),
+
+    // Multi-select action bar
+    multiActionBar:    document.getElementById("multiActionBar"),
+    multiActionCount:  document.getElementById("multiActionCount"),
+    multiActionDelete: document.getElementById("multiActionDelete"),
+    multiActionClear:  document.getElementById("multiActionClear")
   };
 
   /* ── Boot ───────────────────────────────────────────────────────────────────── */
@@ -258,7 +292,18 @@
     if (Array.isArray(state.ui.detailPropOrder)) detailPropOrder = state.ui.detailPropOrder;
     if (state.ui.propLabels) propLabels = Object.assign({}, DEFAULT_PROP_LABELS, state.ui.propLabels);
     if (state.ui.propsCollapsed !== undefined) propsCollapsed = Boolean(state.ui.propsCollapsed);
-    if (state.ui.listSort) listSort = state.ui.listSort;
+    if (state.ui.listSort) {
+      // Backwards compat: old single-key values → criteria mode with that key first
+      if (["urgency", "value", "modified"].includes(state.ui.listSort)) {
+        listSort = "criteria";
+        const k = state.ui.listSort;
+        sortCriteriaOrder = [k, ...["urgency", "value", "modified"].filter(x => x !== k)];
+      } else {
+        listSort = state.ui.listSort;
+      }
+    }
+    if (Array.isArray(state.ui.sortCriteriaOrder)) sortCriteriaOrder = state.ui.sortCriteriaOrder;
+    if (state.ui.sortDirs) sortDirs = Object.assign({ urgency: "desc", value: "desc", modified: "desc" }, state.ui.sortDirs);
     if (Array.isArray(state.ui.listManualOrder)) listManualOrder = state.ui.listManualOrder;
     if (Array.isArray(state.ui.listPropOrder) && state.ui.listPropOrder.includes("name")) listPropOrder = state.ui.listPropOrder;
 
@@ -282,6 +327,7 @@
     populateAreaSelect();
     populateLaneSelect();
     bindEvents();
+    initLasso();
     render();
   }
 
@@ -340,6 +386,8 @@
         propLabels,
         propsCollapsed,
         listSort,
+        sortCriteriaOrder,
+        sortDirs,
         listManualOrder,
         listPropOrder
       },
@@ -387,6 +435,12 @@
   /* ── Event binding ──────────────────────────────────────────────────────────── */
 
   function bindEvents() {
+    // App menu — Actions-page items (menu toggle handled by header.js)
+    el.menuAppInfo.addEventListener("click",        () => { closeAppMenu(); toggleInfo(); });
+    el.menuExportJson.addEventListener("click",     () => { closeAppMenu(); exportJson(); });
+    el.menuExportMarkdown.addEventListener("click", () => { closeAppMenu(); exportMarkdown(); });
+    el.menuResetSeed.addEventListener("click",      () => { closeAppMenu(); resetToSeed(); });
+
     // Info panel
     el.toggleInfoButton.addEventListener("click", toggleInfo);
     el.exportJsonButton.addEventListener("click", exportJson);
@@ -416,13 +470,66 @@
     // Sort panel (dropdown below, list view only)
     el.sortToggle.addEventListener("click", e => { e.stopPropagation(); toggleSortPanel(); });
     el.sortPanel.addEventListener("click", e => {
-      const btn = e.target.closest("[data-sort]");
-      if (!btn) return;
-      listSort = btn.dataset.sort;
-      writeState();
-      syncSortPanel();
-      closeSortPanel();
-      render();
+      // Prevent document-level close handler from seeing this click.
+      // renderSortPanel() replaces innerHTML so e.target becomes detached;
+      // without stopPropagation the contains() check fails and closes the panel.
+      e.stopPropagation();
+
+      // Reset button
+      if (e.target.closest("[data-sort-reset]")) {
+        listSort = "manual";
+        sortExpandedKey = null;
+        writeState();
+        renderSortPanel();
+        attachSortCriteriaDrag();
+        render();
+        return;
+      }
+      // Manual order row
+      if (e.target.closest("[data-sort-manual]")) {
+        listSort = "manual";
+        sortExpandedKey = null;
+        writeState();
+        renderSortPanel();
+        attachSortCriteriaDrag();
+        closeSortPanel();
+        render();
+        return;
+      }
+      // Direction expand/collapse toggle (the right-side button on a criteria row)
+      const expandBtn = e.target.closest("[data-sort-expand]");
+      if (expandBtn) {
+        const key = expandBtn.dataset.sortExpand;
+        sortExpandedKey = sortExpandedKey === key ? null : key;
+        if (listSort !== "criteria") { listSort = "criteria"; }
+        writeState();
+        renderSortPanel();
+        attachSortCriteriaDrag();
+        return;
+      }
+      // Direction option (sub-row)
+      const dirBtn = e.target.closest("[data-sort-dir]");
+      if (dirBtn && dirBtn.dataset.sortFor) {
+        sortDirs[dirBtn.dataset.sortFor] = dirBtn.dataset.sortDir;
+        sortExpandedKey = null;
+        listSort = "criteria";
+        writeState();
+        renderSortPanel();
+        attachSortCriteriaDrag();
+        render();
+        return;
+      }
+      // Criteria row body click → activate criteria mode (keep panel open)
+      const criteriaRow = e.target.closest("[data-sort-key]");
+      if (criteriaRow && !e.target.closest("[data-sort-drag]")) {
+        listSort = "criteria";
+        sortExpandedKey = null;
+        writeState();
+        renderSortPanel();
+        attachSortCriteriaDrag();
+        render();
+        return;
+      }
     });
 
     // Create button
@@ -436,6 +543,7 @@
     el.cancelEditButton.addEventListener("click", closeTaskModal);
     el.taskModal.addEventListener("click", e => { if (e.target === el.taskModal) closeTaskModal(); });
     el.taskForm.addEventListener("submit", handleTaskSubmit);
+    initVoiceInput();
 
     // Detail panel
     el.detailBackdrop.addEventListener("click", closeDetail);
@@ -616,6 +724,8 @@
         if (!el.renameModal.hidden)    { closeRenameModal(); return; }
         if (!el.addColModal.hidden)    { closeAddColModal(); return; }
         if (!el.detailOverlay.hidden)  { closeDetail(); return; }
+        // App menu
+        if (el.appMenuDropdown && !el.appMenuDropdown.hidden) { closeAppMenu(); return; }
         // Toolbar popovers and panels
         if (!el.filterPanel.hidden)    { closeFilterPanel(); return; }
         if (!el.sortPanel.hidden)      { closeSortPanel(); return; }
@@ -629,6 +739,8 @@
         if (!el.colMenu.hidden) { closeColMenu(); return; }
         // Search / bar drawer
         if (activeBarMode !== null) { setBarMode(activeBarMode); return; }
+        // Multi-select — dissolve so the user sees what was selected fade out
+        if (selectedTaskIds.size > 0) { dissolveSelection(); return; }
         // List row focus
         const focused = document.querySelector(".list-row.is-focused");
         if (focused) { focused.classList.remove("is-focused"); return; }
@@ -654,7 +766,13 @@
         selectAtDeletedPosition();
         return;
       }
+      // Delete / Backspace — intuitive bulk-delete for lasso selections
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedTaskIds.size > 0) { e.preventDefault(); bulkDeleteSelected(); return; }
+      }
       if (e.key === "d" || e.key === "D") {
+        // Bulk delete when items are selected via lasso
+        if (selectedTaskIds.size > 0) { e.preventDefault(); bulkDeleteSelected(); return; }
         if (!el.detailOverlay.hidden && detailTaskId) {
           e.preventDefault();
           const t = getTask(detailTaskId);
@@ -676,6 +794,223 @@
         }
       }
     });
+  }
+
+  /* ── Multi-select / Lasso ────────────────────────────────────────────────── */
+
+  // Instant clear — used programmatically (new lasso, after delete, view switch).
+  function clearSelection() {
+    selectedTaskIds.clear();
+    document.querySelectorAll(".list-row.is-selected, .board-card.is-selected")
+      .forEach(node => node.classList.remove("is-selected"));
+    renderMultiActionBar();
+  }
+
+  // Animated dissolve — used when the user explicitly deselects (Esc, × button, click outside).
+  // The action bar hides immediately; the visual highlight fades out on the cards.
+  function dissolveSelection() {
+    if (!selectedTaskIds.size) return;
+    const nodes = [];
+    selectedTaskIds.forEach(id => {
+      document.querySelectorAll(`[data-task-id="${id}"]`).forEach(n => nodes.push(n));
+    });
+    selectedTaskIds.clear();
+    renderMultiActionBar(); // hides bar immediately
+    nodes.forEach(node => {
+      node.classList.remove("is-selected");
+      node.classList.add("is-dissolving");
+      node.addEventListener("animationend", () => node.classList.remove("is-dissolving"), { once: true });
+    });
+  }
+
+  function renderMultiActionBar() {
+    const count = selectedTaskIds.size;
+    el.multiActionBar.hidden = count === 0;
+    if (count > 0) {
+      el.multiActionCount.textContent = `${count} selected`;
+    }
+  }
+
+  function toggleTaskSelection(taskId) {
+    if (selectedTaskIds.has(taskId)) {
+      selectedTaskIds.delete(taskId);
+      document.querySelectorAll(`[data-task-id="${taskId}"]`)
+        .forEach(node => node.classList.remove("is-selected"));
+    } else {
+      selectedTaskIds.add(taskId);
+      document.querySelectorAll(`[data-task-id="${taskId}"]`)
+        .forEach(node => node.classList.add("is-selected"));
+    }
+    renderMultiActionBar();
+  }
+
+  function bulkDeleteSelected() {
+    if (!selectedTaskIds.size) return;
+    const ids   = [...selectedTaskIds];
+    const count = ids.length;
+
+    const doDelete = () => {
+      ids.forEach(id => {
+        const idx = tasks.findIndex(t => t.id === id);
+        if (idx === -1) return;
+        pushUndo({ type: "delete", task: Object.assign({}, tasks[idx]), index: idx });
+        tasks = tasks.filter(t => t.id !== id);
+      });
+      clearSelection();
+      writeState();
+      render();
+      showUndoToast(`${count} task${count === 1 ? "" : "s"} deleted — Cmd/Ctrl+Z to undo`);
+    };
+
+    if (localStorage.getItem("lbm_skipDeleteConfirm") === "true") { doDelete(); return; }
+
+    const overlay = document.createElement("div");
+    overlay.className = "delete-confirm-overlay";
+    overlay.innerHTML = `
+      <div class="delete-confirm-dialog">
+        <div class="delete-confirm-header">
+          <p class="delete-confirm-title">Delete ${count} task${count === 1 ? "" : "s"}?</p>
+          <p class="delete-confirm-sub">Press Cmd/Ctrl+Z to undo each one.</p>
+        </div>
+        <label class="delete-confirm-skip"><input type="checkbox" id="deleteSkipCheck"><span>Don't ask again</span></label>
+        <div class="delete-confirm-actions">
+          <button class="ghost" id="deleteCancelBtn">Cancel</button>
+          <button class="danger" id="deleteConfirmBtn">Delete ${count}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cancelBtn  = overlay.querySelector("#deleteCancelBtn");
+    const confirmBtn = overlay.querySelector("#deleteConfirmBtn");
+    const cleanup = () => overlay.remove();
+    cancelBtn.onclick  = cleanup;
+    confirmBtn.onclick = () => {
+      if (overlay.querySelector("#deleteSkipCheck").checked) localStorage.setItem("lbm_skipDeleteConfirm", "true");
+      cleanup();
+      doDelete();
+    };
+    overlay.addEventListener("click", e => { if (e.target === overlay) cleanup(); });
+    const escH = e => { if (e.key === "Escape") { cleanup(); document.removeEventListener("keydown", escH); } };
+    document.addEventListener("keydown", escH);
+    confirmBtn.focus();
+  }
+
+  function initLasso() {
+    function getSelectableCards() {
+      if (activeView === "list") {
+        return [...el.taskList.querySelectorAll(".list-row[data-task-id]")];
+      }
+      return [...el.boardColumns.querySelectorAll(".board-card[data-task-id]")];
+    }
+
+    function rectsIntersect(a, bLeft, bTop, bRight, bBottom) {
+      return !(a.right < bLeft || a.left > bRight || a.bottom < bTop || a.top > bBottom);
+    }
+
+    function updateFromLasso(x1, y1, x2, y2) {
+      const left   = Math.min(x1, x2);
+      const top    = Math.min(y1, y2);
+      const right  = Math.max(x1, x2);
+      const bottom = Math.max(y1, y2);
+
+      if (lassoEl) {
+        lassoEl.style.left   = left + "px";
+        lassoEl.style.top    = top + "px";
+        lassoEl.style.width  = (right - left) + "px";
+        lassoEl.style.height = (bottom - top) + "px";
+      }
+
+      // Update which cards are intersected
+      selectedTaskIds.clear();
+      getSelectableCards().forEach(node => {
+        const r = node.getBoundingClientRect();
+        if (rectsIntersect(r, left, top, right, bottom)) {
+          node.classList.add("is-selected");
+          selectedTaskIds.add(node.dataset.taskId);
+        } else {
+          node.classList.remove("is-selected");
+        }
+      });
+      renderMultiActionBar();
+    }
+
+    // Don't start a lasso if the mousedown lands on an interactive element or
+    // a UI panel/overlay that should receive its own click events.
+    function isInteractive(target) {
+      return !!target.closest(
+        ".list-row, .board-card, button, input, textarea, select, a, " +
+        ".list-drag-handle, [contenteditable], .board-column-header, " +
+        ".board-col-add-btn, .board-col-new-btn, .inline-new-form, " +
+        ".col-drop-indicator, .site-header, #filterPanel, #sortPanel, " +
+        "#settingsPopover, #shortcutsPanel, #taskModal, #renameModal, " +
+        "#addColModal, .delete-confirm-overlay, #detailPanel, #colMenu, " +
+        "#multiActionBar, .panel-backdrop, .board-hidden-groups, " +
+        ".board-add-column, .completed-wrap, .lasso-rect"
+      );
+    }
+
+    function onMouseDown(e) {
+      if (e.button !== 0) return;
+      if (isInteractive(e.target)) return;
+      if (!el.detailOverlay.hidden) return;
+      if (document.querySelector(".delete-confirm-overlay")) return;
+      if (!el.taskModal.hidden) return;
+      if (!el.renameModal.hidden || !el.addColModal.hidden) return;
+
+      // Only activate within the context of the currently active view.
+      // This gives universal coverage (incl. empty space below/beside content)
+      // while still ignoring clicks on the header, toolbar, etc.
+      if (activeView === "list") {
+        if (e.target.closest("#boardView")) return;
+        // Must be in the page content area (not header/toolbar)
+        if (!e.target.closest("#listView, .page-wrap")) return;
+      } else if (activeView === "board") {
+        if (!e.target.closest("#boardView")) return;
+      } else {
+        return;
+      }
+
+      e.preventDefault();
+      lassoActive = true;
+      lassoStart  = { x: e.clientX, y: e.clientY };
+      let lassoMoved = false; // true once the mouse actually drags (not just clicks)
+
+      lassoEl = document.createElement("div");
+      lassoEl.className = "lasso-rect";
+      lassoEl.style.left = e.clientX + "px";
+      lassoEl.style.top  = e.clientY + "px";
+      lassoEl.style.width  = "0";
+      lassoEl.style.height = "0";
+      document.body.appendChild(lassoEl);
+
+      const onMove = ev => {
+        if (!lassoActive) return;
+        if (!lassoMoved) {
+          lassoMoved = true;
+          clearSelection(); // clear existing selection only when a real lasso drag starts
+        }
+        updateFromLasso(lassoStart.x, lassoStart.y, ev.clientX, ev.clientY);
+      };
+
+      const onUp = () => {
+        lassoActive = false;
+        if (lassoEl) { lassoEl.remove(); lassoEl = null; }
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup",   onUp);
+        // A click without dragging = click outside — dissolve the selection slowly
+        if (!lassoMoved) dissolveSelection();
+      };
+
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup",   onUp);
+    }
+
+    // Listen at document level so the lasso fires even when clicking below/beside
+    // the content area (e.g. empty space beneath a short task list).
+    document.addEventListener("mousedown", onMouseDown);
+
+    // Wire up the action bar buttons
+    el.multiActionDelete.addEventListener("click", bulkDeleteSelected);
+    el.multiActionClear.addEventListener("click",  dissolveSelection);
   }
 
   /* ── List keyboard navigation ───────────────────────────────────────────────── */
@@ -735,6 +1070,7 @@
 
   function setView(view) {
     activeView = view;
+    clearSelection();
     writeState();
     syncViewMode();
     render();
@@ -873,16 +1209,121 @@
   }
 
   function syncSortPanel() {
-    el.sortPanel.querySelectorAll("[data-sort]").forEach(btn => {
-      const active = btn.dataset.sort === listSort;
-      btn.classList.toggle("is-active", active);
-      btn.setAttribute("aria-checked", String(active));
-    });
+    renderSortPanel();
+    // attachSortCriteriaDrag reads #sortCriteriaList which exists after render
+    attachSortCriteriaDrag();
   }
 
   function syncBarSortBtns() {
-    // Kept for compatibility — syncs the sort panel
-    syncSortPanel();
+    // Only update the has-value dot; don't rebuild panel HTML while it could be open
+    el.sortToggle.classList.toggle("has-value", listSort !== "manual");
+  }
+
+  function renderSortPanel() {
+    const SORT_LABELS = {
+      urgency:  propLabels.urgency  || "Urgency",
+      value:    propLabels.value    || "Dollar Value",
+      modified: propLabels.modified || "Modified"
+    };
+    const DIR_LABELS = {
+      urgency:  { desc: "High \u2192 Low", asc: "Low \u2192 High" },
+      value:    { desc: "High \u2192 Low", asc: "Low \u2192 High" },
+      modified: { desc: "Newest first",   asc: "Oldest first"    }
+    };
+    const chevronSvg = `<svg class="sort-dir-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+    const dragSvg    = `<svg class="sort-drag-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>`;
+
+    let html = `<div class="sort-panel-header">
+      <span class="sort-panel-title">Sort by</span>
+      <button class="sort-reset-btn" data-sort-reset title="Reset to manual order"${listSort === "manual" ? " disabled" : ""}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Reset
+      </button>
+    </div>`;
+
+    html += `<div class="sort-criteria-list" id="sortCriteriaList">`;
+    sortCriteriaOrder.forEach((key, idx) => {
+      const expanded = sortExpandedKey === key;
+      const dir      = sortDirs[key] || "desc";
+      const dirLabel = DIR_LABELS[key][dir];
+      const criteriaActive = listSort === "criteria";
+      html += `<div class="sort-criteria-row${criteriaActive ? " is-mode-active" : ""}" draggable="true" data-sort-key="${key}" data-sort-idx="${idx}">
+        <span class="sort-drag-handle" data-sort-drag="${key}">${dragSvg}</span>
+        <span class="sort-criteria-label">${SORT_LABELS[key]}</span>
+        <button class="sort-dir-toggle${expanded ? " is-expanded" : ""}" data-sort-expand="${key}" title="Change direction">
+          <span class="sort-dir-cur-label">${dirLabel}</span>
+          ${chevronSvg}
+        </button>
+      </div>`;
+      if (expanded) {
+        html += `<div class="sort-dir-options" data-sort-options-for="${key}">
+          <button class="sort-dir-option${dir === "desc" ? " is-active" : ""}" data-sort-dir="desc" data-sort-for="${key}">${DIR_LABELS[key].desc}</button>
+          <button class="sort-dir-option${dir === "asc"  ? " is-active" : ""}" data-sort-dir="asc"  data-sort-for="${key}">${DIR_LABELS[key].asc}</button>
+        </div>`;
+      }
+    });
+    html += `</div>`;
+
+    html += `<div class="sort-panel-sep"></div>`;
+    html += `<button class="dropdown-item sort-manual-item${listSort === "manual" ? " is-active" : ""}" data-sort-manual role="menuitemradio" aria-checked="${listSort === "manual"}">Manual order</button>`;
+
+    el.sortPanel.innerHTML = html;
+
+    // Dot on the sort toggle when not in manual mode
+    el.sortToggle.classList.toggle("has-value", listSort !== "manual");
+  }
+
+  function attachSortCriteriaDrag() {
+    const list = document.getElementById("sortCriteriaList");
+    if (!list) return;
+    let dragKey  = null;
+    let dragOver = null;
+
+    list.addEventListener("dragstart", e => {
+      const row = e.target.closest("[data-sort-key]");
+      if (!row) { e.preventDefault(); return; }
+      dragKey = row.dataset.sortKey;
+      e.dataTransfer.effectAllowed = "move";
+      setTimeout(() => row.classList.add("is-dragging"), 0);
+    });
+
+    list.addEventListener("dragend", e => {
+      list.querySelectorAll(".sort-criteria-row").forEach(r => {
+        r.classList.remove("is-dragging", "drag-over-above", "drag-over-below");
+      });
+      dragKey  = null;
+      dragOver = null;
+    });
+
+    list.addEventListener("dragover", e => {
+      e.preventDefault();
+      const row = e.target.closest("[data-sort-key]");
+      if (!row || row.dataset.sortKey === dragKey) return;
+      list.querySelectorAll(".sort-criteria-row").forEach(r => r.classList.remove("drag-over-above", "drag-over-below"));
+      const rect  = row.getBoundingClientRect();
+      const above = e.clientY < rect.top + rect.height / 2;
+      row.classList.add(above ? "drag-over-above" : "drag-over-below");
+      dragOver = { key: row.dataset.sortKey, above };
+    });
+
+    list.addEventListener("drop", e => {
+      e.preventDefault();
+      if (!dragKey || !dragOver) return;
+      const fromIdx = sortCriteriaOrder.indexOf(dragKey);
+      let   toIdx   = sortCriteriaOrder.indexOf(dragOver.key);
+      if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+      sortCriteriaOrder.splice(fromIdx, 1);
+      // Re-find target index after splice
+      toIdx = sortCriteriaOrder.indexOf(dragOver.key);
+      const insertAt = dragOver.above ? toIdx : toIdx + 1;
+      sortCriteriaOrder.splice(insertAt, 0, dragKey);
+      listSort = "criteria";
+      sortExpandedKey = null;
+      writeState();
+      renderSortPanel();
+      attachSortCriteriaDrag();
+      render();
+    });
   }
 
   /* ── Info panel ─────────────────────────────────────────────────────────────── */
@@ -908,6 +1349,18 @@
     } else {
       renderBoardView(filtered);
     }
+    // Re-apply selection highlights after every DOM rebuild so the action bar
+    // and visual selection stay in sync even after unrelated re-renders.
+    reapplySelection();
+  }
+
+  // Re-stamp is-selected on freshly-built DOM nodes whose IDs are still selected.
+  function reapplySelection() {
+    if (!selectedTaskIds.size) return;
+    selectedTaskIds.forEach(id => {
+      document.querySelectorAll(`[data-task-id="${id}"]`)
+        .forEach(node => node.classList.add("is-selected"));
+    });
   }
 
   function renderStats() {
@@ -961,7 +1414,7 @@
     el.taskList.innerHTML = "";
 
     if (!active.length) {
-      el.taskList.innerHTML = '<div class="empty-state">No active tasks. Press N to add one.</div>';
+      el.taskList.innerHTML = '<div class="empty-state-group"><div class="empty-state"><span class="empty-state-text">No active tasks. Press <kbd class="kbd-key">N</kbd> to add one.</span><button class="empty-state-btn" onclick="document.dispatchEvent(new KeyboardEvent(\'keydown\', {key:\'n\', bubbles:true}))">+ New Task</button></div><div class="empty-state empty-state--secondary"><span class="empty-state-text">New here? Find out more about the application <a href="docs.html" class="empty-state-link">here</a>.</span></div></div>';
     } else {
       active.forEach(t => el.taskList.appendChild(buildListRow(t, true)));
     }
@@ -989,18 +1442,59 @@
         if (e.target.closest(".list-tools")) { e.preventDefault(); return; }
         listDragTaskId = task.id;
         e.dataTransfer.effectAllowed = "move";
-        setTimeout(() => row.classList.add("is-dragging"), 0);
+
+        // Multi-drag: if this row is part of the active selection, drag all selected
+        // rows together, preserving their current visual order.
+        if (selectedTaskIds.has(task.id) && selectedTaskIds.size > 1) {
+          const allRows = [...el.taskList.querySelectorAll(".list-row[data-task-id]")];
+          listDragMultiIds = allRows
+            .map(r => r.dataset.taskId)
+            .filter(id => selectedTaskIds.has(id));
+
+          // Custom drag ghost showing the count
+          const ghost = document.createElement("div");
+          ghost.textContent = `${listDragMultiIds.length} tasks`;
+          ghost.style.cssText =
+            "position:fixed;top:-200px;left:-200px;" +
+            "background:#8b5cf6;color:#f8f9fa;" +
+            "padding:4px 10px;border-radius:6px;" +
+            "font-size:12px;font-family:inherit;pointer-events:none;";
+          document.body.appendChild(ghost);
+          e.dataTransfer.setDragImage(ghost, 44, 14);
+          setTimeout(() => ghost.remove(), 0);
+        } else {
+          listDragMultiIds = [];
+        }
+
+        setTimeout(() => {
+          row.classList.add("is-dragging");
+          // Dim all other selected rows to show they're moving together
+          listDragMultiIds.forEach(id => {
+            if (id === task.id) return;
+            const r = el.taskList.querySelector(`[data-task-id="${id}"]`);
+            if (r) r.classList.add("is-dragging");
+          });
+        }, 0);
       });
 
       row.addEventListener("dragend", () => {
         listDragTaskId = null;
         listDragOverId = null;
         row.classList.remove("is-dragging");
+        // Un-dim any co-dragged rows
+        listDragMultiIds.forEach(id => {
+          const r = el.taskList.querySelector(`[data-task-id="${id}"]`);
+          if (r) r.classList.remove("is-dragging");
+        });
+        listDragMultiIds = [];
         clearListDragIndicators();
       });
 
       row.addEventListener("dragover", e => {
-        if (!listDragTaskId || listDragTaskId === task.id) return;
+        if (!listDragTaskId) return;
+        // Skip if drop target is one of the items being dragged
+        const dragIds = listDragMultiIds.length > 1 ? listDragMultiIds : [listDragTaskId];
+        if (dragIds.includes(task.id)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         const rect  = row.getBoundingClientRect();
@@ -1021,28 +1515,30 @@
       });
 
       row.addEventListener("drop", e => {
-        if (!listDragTaskId || listDragTaskId === task.id) return;
+        if (!listDragTaskId) return;
+        const dragIds = listDragMultiIds.length > 1 ? listDragMultiIds : [listDragTaskId];
+        if (dragIds.includes(task.id)) return;
         e.preventDefault();
         row.classList.remove("drag-over-above", "drag-over-below");
 
-        const rows       = [...el.taskList.querySelectorAll("[data-task-id]")];
+        const rows         = [...el.taskList.querySelectorAll("[data-task-id]")];
         const currentOrder = rows.map(r => r.dataset.taskId);
-        const fromIdx    = currentOrder.indexOf(listDragTaskId);
-        const toIdx      = currentOrder.indexOf(task.id);
-        if (fromIdx === -1 || toIdx === -1) return;
 
-        const newOrder  = currentOrder.slice();
-        const [moved]   = newOrder.splice(fromIdx, 1);
-        const targetIdx = newOrder.indexOf(task.id);
-        const insertAt  = listDropAbove ? targetIdx : targetIdx + 1;
-        newOrder.splice(insertAt, 0, moved);
+        // Remove all dragged IDs from the order, then re-insert at the drop position
+        const filtered = currentOrder.filter(id => !dragIds.includes(id));
+        const targetIdx = filtered.indexOf(task.id);
+        if (targetIdx === -1) return;
 
-        listManualOrder = newOrder;
-        listSort        = "manual";
-        listDragTaskId  = null;
-        listDragOverId  = null;
+        const insertAt = listDropAbove ? targetIdx : targetIdx + 1;
+        filtered.splice(insertAt, 0, ...dragIds);
+
+        listManualOrder  = filtered;
+        listSort         = "manual";
+        listDragTaskId   = null;
+        listDragOverId   = null;
+        listDragMultiIds = [];
         writeState();
-        render();
+        render(); // reapplySelection() inside render re-stamps is-selected on rebuilt nodes
       });
     }
 
@@ -1137,9 +1633,21 @@
       content.appendChild(row);
     }
 
-    // Hover tools
+    // Hover tools — single group on the right: delete | edit | done
     const tools = document.createElement("div");
     tools.className = "list-tools";
+
+    const delBtn = makeIconBtn("Delete task", trashIcon(), e => {
+      e.stopPropagation();
+      confirmDelete(() => deleteTask(task.id));
+    });
+    delBtn.classList.add("icon-button--danger");
+    tools.appendChild(delBtn);
+
+    tools.appendChild(makeIconBtn("Open", pencilIcon(), e => {
+      e.stopPropagation();
+      openDetail(task.id);
+    }));
 
     const doneBtn = document.createElement("button");
     doneBtn.className = "mark-done-btn";
@@ -1150,19 +1658,17 @@
       const nextLane = DONE_LANES.includes(task.lane) ? "backlog" : "completed";
       moveTask(task.id, nextLane);
     });
-
-    tools.appendChild(makeIconBtn("Open", pencilIcon(), e => {
-      e.stopPropagation();
-      openDetail(task.id);
-    }));
     tools.appendChild(doneBtn);
 
     row.appendChild(dot);
     row.appendChild(content);
     row.appendChild(tools);
 
-    // Click anywhere on row (except title) opens detail panel
-    row.addEventListener("click", () => openDetail(task.id));
+    // Click anywhere on row (except title) opens detail panel, or toggles selection
+    row.addEventListener("click", () => {
+      if (selectedTaskIds.size > 0) { toggleTaskSelection(task.id); return; }
+      openDetail(task.id);
+    });
 
     return row;
   }
@@ -1304,7 +1810,7 @@
 
     const countEl = document.createElement("div");
     countEl.className = "board-column-count";
-    countEl.textContent = String(colTasks.length);
+    if (colTasks.length > 0) countEl.textContent = String(colTasks.length);
 
     left.appendChild(grip);
     left.appendChild(titleEl);
@@ -1401,12 +1907,37 @@
       if (colDragKey) { e.stopPropagation(); return; } // don't interfere with col drag
       dragTaskId = task.id;
       e.stopPropagation(); // prevent bubbling to section (its dragstart calls preventDefault, cancelling this drag)
-      setTimeout(() => card.classList.add("is-dragging"), 0);
       e.dataTransfer.effectAllowed = "move";
+
+      // Multi-drag: show a count ghost and dim all other selected cards
+      if (selectedTaskIds.has(task.id) && selectedTaskIds.size > 1) {
+        const ghost = document.createElement("div");
+        ghost.textContent = `${selectedTaskIds.size} tasks`;
+        ghost.style.cssText =
+          "position:fixed;top:-200px;left:-200px;" +
+          "background:#8b5cf6;color:#f8f9fa;" +
+          "padding:4px 10px;border-radius:6px;" +
+          "font-size:12px;font-family:inherit;pointer-events:none;";
+        document.body.appendChild(ghost);
+        e.dataTransfer.setDragImage(ghost, 44, 14);
+        setTimeout(() => ghost.remove(), 0);
+      }
+
+      setTimeout(() => {
+        card.classList.add("is-dragging");
+        if (selectedTaskIds.has(task.id)) {
+          document.querySelectorAll(".board-card.is-selected").forEach(c => {
+            if (c !== card) c.classList.add("is-dragging");
+          });
+        }
+      }, 0);
     });
     card.addEventListener("dragend", () => {
       dragTaskId = null;
       card.classList.remove("is-dragging");
+      // Un-dim any co-dragged selected cards
+      document.querySelectorAll(".board-card.is-selected.is-dragging")
+        .forEach(c => c.classList.remove("is-dragging"));
       clearCardDropIndicators();
       document.querySelectorAll(".board-column-body").forEach(b => b.classList.remove("drag-over"));
     });
@@ -1469,7 +2000,10 @@
       }
     }
 
-    card.addEventListener("click", () => openDetail(task.id));
+    card.addEventListener("click", () => {
+      if (selectedTaskIds.size > 0) { toggleTaskSelection(task.id); return; }
+      openDetail(task.id);
+    });
 
     return card;
   }
@@ -1527,7 +2061,14 @@
       e.preventDefault();
       body.classList.remove("drag-over");
       clearCardDropIndicators();
-      if (dragTaskId) moveTask(dragTaskId, body.dataset.dropLane);
+      if (!dragTaskId) return;
+      const lane = body.dataset.dropLane;
+      // Multi-drag: move all selected cards to the target lane together
+      if (selectedTaskIds.has(dragTaskId) && selectedTaskIds.size > 1) {
+        moveTasks([...selectedTaskIds], lane);
+      } else {
+        moveTask(dragTaskId, lane);
+      }
     });
   }
 
@@ -1796,6 +2337,9 @@
       if (v) propLabels[propKey] = v;
       writeState();
       labelEl.textContent = propLabels[propKey] || propKey;
+      // Propagate renamed label to sort panel and settings popover
+      syncSortPanel();
+      if (!el.settingsPopover.hidden) renderSettingsPopover();
     };
     input.addEventListener("blur", save);
     input.addEventListener("keydown", e => {
@@ -1956,10 +2500,10 @@
       h.textContent = "Card fields";
       pop.appendChild(h);
       [
-        ["urgency", "Urgency",       () => cardVisibleProps.urgency, v => { cardVisibleProps.urgency = v; }],
-        ["notes",   "Notes preview", () => cardVisibleProps.notes,   v => { cardVisibleProps.notes   = v; }],
-        ["value",   "Value",         () => cardVisibleProps.value,   v => { cardVisibleProps.value   = v; }],
-        ["area",    "Area",          () => cardVisibleProps.area,    v => { cardVisibleProps.area    = v; }],
+        ["urgency", propLabels.urgency || "Urgency", () => cardVisibleProps.urgency, v => { cardVisibleProps.urgency = v; }],
+        ["notes",   "Notes preview",                () => cardVisibleProps.notes,   v => { cardVisibleProps.notes   = v; }],
+        ["value",   propLabels.value   || "Value",  () => cardVisibleProps.value,   v => { cardVisibleProps.value   = v; }],
+        ["area",    propLabels.area    || "Area",   () => cardVisibleProps.area,    v => { cardVisibleProps.area    = v; }],
       ].forEach(([, label, getVal, setVal]) => {
         const row = document.createElement("label");
         row.className = "toggle-item";
@@ -1978,7 +2522,6 @@
   }
 
   function buildSettingsPropRow(key) {
-    const LABELS = { name: "Name", urgency: "Urgency", value: "Value ($)", area: "Area" };
     const row = document.createElement("div");
     row.className = "toggle-item settings-prop-row";
     row.dataset.propKey = key;
@@ -1991,7 +2534,7 @@
 
     const lbl = document.createElement("span");
     lbl.className = "toggle-label settings-prop-label";
-    lbl.textContent = LABELS[key] || key;
+    lbl.textContent = key === "name" ? "Name" : (propLabels[key] || key);
     row.appendChild(lbl);
 
     if (key === "name") {
@@ -2135,6 +2678,23 @@
     render();
     // Refresh detail panel if open
     if (detailTaskId === taskId) refreshDetailProps(getTask(taskId));
+  }
+
+  // Move multiple selected tasks to a lane at once (used by multi-drag on board).
+  function moveTasks(taskIds, nextLane) {
+    taskIds.forEach(id => {
+      const existing = getTask(id);
+      if (existing && existing.lane !== nextLane) {
+        pushUndo({ type: "lane-change", taskId: id, fromLane: existing.lane, toLane: nextLane, taskTitle: existing.title });
+      }
+    });
+    tasks = tasks.map(t =>
+      taskIds.includes(t.id) ? Object.assign({}, t, { lane: nextLane, lastModified: today() }) : t
+    );
+    writeState();
+    render(); // reapplySelection() inside render re-stamps is-selected on rebuilt nodes
+    const count = taskIds.length;
+    showUndoToast(`${count} task${count === 1 ? "" : "s"} moved — Cmd/Ctrl+Z to undo`);
   }
 
   function confirmDelete(onConfirm) {
@@ -2362,11 +2922,10 @@
       body.appendChild(propsDiv);
     }
 
-    const titleInput = document.createElement("input");
-    titleInput.type = "text";
+    const titleInput = document.createElement("div");
     titleInput.className = "list-inline-new-title";
-    titleInput.placeholder = "Type the title…";
-    titleInput.autocomplete = "off";
+    titleInput.contentEditable = "true";
+    titleInput.dataset.placeholder = "Type the title…";
     body.appendChild(titleInput);
 
     const belowInputs = afterKeys.map(buildInlineInput).filter(Boolean);
@@ -2418,8 +2977,8 @@
 
     setTimeout(() => document.addEventListener("mousedown", outsideClickHandler), 0);
 
-    function save() {
-      const title = titleInput.value.trim();
+    function save(keepOpen = false) {
+      const title = titleInput.innerText.trim();
       if (!title) { titleInput.focus(); return; }
       const urgencyVal = urgencySelect ? clamp(Number(urgencySelect.value) || 3, 1, 5) : 3;
       const newTask = {
@@ -2440,16 +2999,48 @@
       tasks.unshift(newTask);
       const addedId = newTask.id;
       writeState();
-      document.removeEventListener("mousedown", outsideClickHandler);
-      form.remove();
-      render();
-      highlightNewRow(addedId);
+
+      if (keepOpen) {
+        // Save and stay: re-render the list so the new task appears,
+        // then re-insert the form at the top and re-focus
+        titleInput.textContent = "";
+        render();
+        el.taskList.insertBefore(form, el.taskList.firstChild);
+        titleInput.focus();
+        // Highlight the added row; if it moved away (filtered/sorted), scroll to it
+        // briefly then scroll back so the user can keep typing.
+        requestAnimationFrame(() => {
+          const row = el.taskList.querySelector(`[data-task-id="${addedId}"]`);
+          if (!row) return;
+          row.classList.add("is-newly-added");
+          row.addEventListener("animationend", () => row.classList.remove("is-newly-added"), { once: true });
+          const formRect = form.getBoundingClientRect();
+          const rowRect  = row.getBoundingClientRect();
+          // Row moved away from the form — do scroll-to-item, then scroll back
+          if (Math.abs(rowRect.top - formRect.bottom) > 80) {
+            scrollRowIntoView(row);
+            setTimeout(() => {
+              const header  = document.querySelector(".site-header");
+              const stickyH = header ? header.getBoundingClientRect().height : 0;
+              const GAP     = 24; // breathing room above the form
+              const targetY = form.getBoundingClientRect().top + window.scrollY - stickyH - GAP;
+              window.scrollTo({ top: targetY, behavior: "smooth" });
+              titleInput.focus();
+            }, 900);
+          }
+        });
+      } else {
+        document.removeEventListener("mousedown", outsideClickHandler);
+        form.remove();
+        render();
+        highlightNewRow(addedId);
+      }
     }
 
-    saveBtn.addEventListener("click", save);
+    saveBtn.addEventListener("click", () => save(false));
     cancelBtn.addEventListener("click", dismiss);
     titleInput.addEventListener("keydown", e => {
-      if (e.key === "Enter") { e.preventDefault(); save(); }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(true); }
       if (e.key === "Escape") { dismiss(); }
     });
   }
@@ -2487,6 +3078,83 @@
     el.taskModal.hidden = true;
     editingId = null;
     el.taskForm.reset();
+    if (el.voiceMicBtn) el.voiceMicBtn.classList.remove("is-listening", "is-error");
+  }
+
+  /* ── Voice input (Web Speech API) ─────────────────────────────────────────── */
+
+  function initVoiceInput() {
+    const btn = el.voiceMicBtn;
+    if (!btn) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      btn.title    = "Voice input not supported in this browser";
+      btn.disabled = true;
+      btn.style.opacity = "0.3";
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.lang            = "en-US";
+    rec.interimResults  = false;
+    rec.maxAlternatives = 1;
+
+    let listening = false;
+
+    btn.addEventListener("click", function() {
+      if (listening) { rec.stop(); return; }
+      rec.start();
+    });
+
+    rec.onstart = function() {
+      listening = true;
+      btn.classList.add("is-listening");
+      btn.setAttribute("aria-label", "Listening… click to stop");
+    };
+
+    rec.onresult = function(e) {
+      const transcript = e.results[0][0].transcript.trim();
+      el.taskTitle.value = transcript;
+      el.taskTitle.focus();
+      applyVoiceInference(transcript);
+    };
+
+    rec.onend = function() {
+      listening = false;
+      btn.classList.remove("is-listening");
+      btn.setAttribute("aria-label", "Dictate title");
+    };
+
+    rec.onerror = function() {
+      listening = false;
+      btn.classList.remove("is-listening");
+      btn.classList.add("is-error");
+      setTimeout(function() { btn.classList.remove("is-error"); }, 1500);
+      btn.setAttribute("aria-label", "Dictate title");
+    };
+  }
+
+  function applyVoiceInference(text) {
+    const lower = text.toLowerCase();
+
+    const urgency =
+      /\b(critical|blocker|blocking|urgent|asap|emergency)\b/.test(lower)                       ? 5 :
+      /\b(high[ -]priority|important|soon|immediately)\b/.test(lower)                            ? 4 :
+      /\b(when (i get to it|possible)|low[ -]priority|someday|eventually)\b/.test(lower)         ? 2 :
+      /\b(low|minor|nice to have|optional)\b/.test(lower)                                        ? 1 : null;
+
+    if (urgency !== null && el.taskUrgency) el.taskUrgency.value = String(urgency);
+
+    const area =
+      /\b(doc(s|ument(ation)?)|readme|guide|write.?up)\b/.test(lower)           ? "docs"           :
+      /\b(security|auth(entication)?|permission|access|ssl|cert)\b/.test(lower)  ? "security"       :
+      /\b(design|ui|ux|layout|style|css|color|font)\b/.test(lower)              ? "ui-ux"          :
+      /\b(platform|infra(structure)?|deploy|server|build|ci|cd)\b/.test(lower)  ? "platform"       :
+      /\b(release|version|ship|launch|publish)\b/.test(lower)                   ? "release"        :
+      /\b(product|feature|workflow|user story)\b/.test(lower)                   ? "product"        : null;
+
+    if (area !== null && el.taskArea) el.taskArea.value = area;
   }
 
   function handleTaskSubmit(e) {
@@ -2649,26 +3317,29 @@
   /* ── Sorting ────────────────────────────────────────────────────────────────── */
 
   function sortTasks(a, b) {
-    switch (listSort) {
-      case "manual": {
-        const ai = listManualOrder.indexOf(a.id);
-        const bi = listManualOrder.indexOf(b.id);
-        if (ai === -1 && bi === -1) return 0;
-        if (ai === -1) return 1;   // unknown tasks sink to bottom
-        if (bi === -1) return -1;
-        return ai - bi;
-      }
-      case "value":
-        if (b.value   !== a.value)   return b.value   - a.value;
-        if (b.urgency !== a.urgency) return b.urgency - a.urgency;
-        return String(b.lastModified).localeCompare(String(a.lastModified));
-      case "modified":
-        return String(b.lastModified).localeCompare(String(a.lastModified));
-      default: // "urgency"
-        if (b.urgency !== a.urgency) return b.urgency - a.urgency;
-        if (b.value   !== a.value)   return b.value   - a.value;
-        return String(b.lastModified).localeCompare(String(a.lastModified));
+    if (listSort === "manual") {
+      const ai = listManualOrder.indexOf(a.id);
+      const bi = listManualOrder.indexOf(b.id);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
     }
+    // Multi-level criteria sort — iterate in priority order.
+    // Uses explicit comparisons (no sign arithmetic) to keep the logic unambiguous.
+    // Array.sort: return -1 → a before b (a higher in list); return 1 → b before a.
+    for (const key of sortCriteriaOrder) {
+      const desc = (sortDirs[key] || "desc") !== "asc"; // true = High→Low / Newest first
+      let aVal, bVal;
+      if      (key === "urgency")  { aVal = a.urgency;                   bVal = b.urgency; }
+      else if (key === "value")    { aVal = a.value;                     bVal = b.value; }
+      else if (key === "modified") { aVal = String(a.lastModified || ""); bVal = String(b.lastModified || ""); }
+      else continue;
+      if (aVal === bVal) continue;            // tie → next criterion
+      if (desc) return aVal > bVal ? -1 : 1; // High→Low: bigger aVal goes first (return -1)
+      else      return aVal < bVal ? -1 : 1; // Low→High: smaller aVal goes first (return -1)
+    }
+    return 0;
   }
 
   /* ── Export ─────────────────────────────────────────────────────────────────── */
@@ -2694,7 +3365,9 @@
   }
 
   function resetToSeed() {
-    if (!confirm("Reset to seed? All local edits will be removed.")) return;
+    // Save snapshot before resetting so the undo banner can restore it
+    var snapshot = localStorage.getItem(STORAGE_KEY);
+
     tasks         = tracker.tasks.map(normalizeTask);
     boardColumns  = DEFAULT_BOARD_COLUMNS.map(c => Object.assign({}, c));
     collapsedCols = [];
@@ -2702,6 +3375,26 @@
     el.seedNotice.hidden = true;
     writeState();
     render();
+
+    var menu = window._lbmAppMenu;
+    if (menu && menu.createUndoBanner) {
+      menu.createUndoBanner("Reset to seed data.", function () {
+        if (snapshot) {
+          localStorage.setItem(STORAGE_KEY, snapshot);
+          location.reload();
+        }
+      });
+    }
+  }
+
+  /* ── App menu helpers (toggle owned by header.js, these are convenience wrappers) */
+
+  function closeAppMenu() {
+    if (el.appMenuDropdown) el.appMenuDropdown.hidden = true;
+    if (el.appMenuBtn) {
+      el.appMenuBtn.setAttribute("aria-expanded", "false");
+      el.appMenuBtn.classList.remove("is-open");
+    }
   }
 
   /* ── Utilities ──────────────────────────────────────────────────────────────── */
@@ -2755,5 +3448,43 @@
   /* ── Boot ───────────────────────────────────────────────────────────────────── */
 
   init();
+
+  /* ── Public API ─────────────────────────────────────────────────────────────── */
+
+  window.LBM = {
+    /**
+     * Add a task from outside the app (e.g. Claude Code browser console).
+     * All fields are optional except `title`. Returns the normalised task.
+     *
+     * Example:
+     *   window.LBM.addTask({ title: "Fix auth bug", urgency: 5, area: "security", value: 10000 })
+     */
+    addTask: function(taskObj) {
+      if (!taskObj || !taskObj.title) {
+        console.error("[LBM] addTask: `title` is required.");
+        return null;
+      }
+      const t = normalizeTask(Object.assign({
+        id:           createId(),
+        lane:         "newly-added-or-updated",
+        lastModified: today()
+      }, taskObj));
+      tasks.unshift(t);
+      justAddedId = t.id;
+      writeState();
+      render();
+      const addedId = t.id;
+      setTimeout(function() { highlightNewRow(addedId); justAddedId = null; }, 0);
+      console.log("[LBM] Task added:", t.id, "—", t.title);
+      return t;
+    },
+
+    /**
+     * Return a snapshot of all current tasks (copies, not live references).
+     */
+    getTasks: function() {
+      return tasks.map(function(t) { return Object.assign({}, t); });
+    }
+  };
 
 })();

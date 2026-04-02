@@ -1,5 +1,19 @@
 # Keyboard Shortcuts
 
+## Design Philosophy
+
+Shortcuts in the LBM follow a single rule: **do what the user will naturally reach for first.**
+
+- `Escape` always dismisses, closes, or clears — in every context, in that priority order.
+- `Delete` and `Backspace` both delete. A user reaching for either should get the same result.
+- `D` is a speed shortcut for power users — it mirrors what `Delete`/`Backspace` do.
+- Arrow keys navigate. `Enter` opens/confirms. These never need explaining.
+- Letter shortcuts (`N`, `?`, `/`) are single-key actions that don't conflict with text input because they are blocked while a field is focused.
+
+If a new action is added and there is an obvious key a user would press, use that key. Don't invent conventions — observe habits.
+
+---
+
 > Shortcuts are active when no text field, textarea, or notes editor is focused.
 > `Ctrl+N` and `Escape` always work regardless of focus.
 
@@ -60,3 +74,23 @@
 |---|---|
 | Save task | `Enter` |
 | Cancel | `Esc` |
+
+---
+
+## Multi-Select (List & Board)
+
+Select multiple tasks by clicking and dragging on empty space. The rubber-band rectangle
+can be started from any direction — left, right, top, or bottom of the content area.
+
+After moving selected tasks (reorder in list view, or drag to another column in board view),
+the items **stay selected** so you can continue acting on them. The selection only dissolves
+when you explicitly dismiss it.
+
+| Action | How |
+|---|---|
+| Start selection | Click and drag on empty space |
+| Toggle item in/out of selection | Click a task while items are selected |
+| Delete all selected | `Delete` · `Backspace` · `D` (or click Delete in the action bar) |
+| Drag selected tasks to new position | Drag any selected task — all move together |
+| Move selected cards to another column | Drag any selected card to the target column |
+| Dismiss selection (slow dissolve) | `Esc` · click × in the action bar · click on empty space |

@@ -381,10 +381,119 @@ window.MCCProjectData = {
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
         references: ["SKILL.md", "SKILL_ADD_SHORTCUT.md"]
+      },
+      {
+        id: "LBM-S006",
+        title: "Expose window.LBM public API in task-app.js",
+        notes: "Add window.LBM = { addTask(), getTasks() } inside the IIFE after init(). addTask() uses normalizeTask() internally and triggers render() + highlightNewRow(). This is the foundation for AI and cross-project task creation.",
+        lane: "newly-added-or-updated",
+        urgency: 4,
+        value: 10000,
+        priority: "P1",
+        area: "product",
+        source: "user-requested",
+        recommendedBy: "",
+        references: ["task-app.js", "SKILL_ADD_TASK.md"]
+      },
+      {
+        id: "LBM-S007",
+        title: "Create SKILL_ADD_TASK.md",
+        notes: "Claude-facing skill file that defines trigger phrases (\"Add this to the task board\", etc.) and inference rules for urgency/value/area from natural language. Claude reads this and generates window.LBM.addTask() commands.",
+        lane: "newly-added-or-updated",
+        urgency: 4,
+        value: 10000,
+        priority: "P1",
+        area: "docs",
+        source: "user-requested",
+        recommendedBy: "",
+        references: ["SKILL_ADD_TASK.md"]
+      },
+      {
+        id: "LBM-S008",
+        title: "Create CLAUDE_INTEGRATION_GUIDE.md",
+        notes: "Guide for using LBM alongside other development projects. Covers the two-tab workflow, cross-project task logging, and guidance for Claude on when to generate commands vs. modify source files.",
+        lane: "newly-added-or-updated",
+        urgency: 3,
+        value: 5000,
+        priority: "P2",
+        area: "docs",
+        source: "user-requested",
+        recommendedBy: "",
+        references: ["CLAUDE_INTEGRATION_GUIDE.md"]
+      },
+      {
+        id: "LBM-S009",
+        title: "Add voice input (Web Speech API) to task creation modal",
+        notes: "Mic button next to the Title field in the New Task modal. Speech fills the title; applyVoiceInference() auto-sets urgency and area based on keyword detection. Three visual states: idle, listening (purple pulse), error (red). Gracefully disabled in Firefox.",
+        lane: "newly-added-or-updated",
+        urgency: 4,
+        value: 10000,
+        priority: "P1",
+        area: "ui-ux",
+        source: "user-requested",
+        recommendedBy: "",
+        references: ["task-app.js", "index.html", "styles.css", "docs/VOICE_COMMANDS.md"]
+      },
+      {
+        id: "LBM-S010",
+        title: "Create docs/AI_TASK_CREATION.md",
+        notes: "User-facing documentation for the docs viewer covering both AI task creation methods: Claude Code skill and voice input. Includes window.LBM API reference, field table, inference tables, and 3 example console commands.",
+        lane: "newly-added-or-updated",
+        urgency: 3,
+        value: 5000,
+        priority: "P2",
+        area: "docs",
+        source: "user-requested",
+        recommendedBy: "",
+        references: ["docs/AI_TASK_CREATION.md"]
+      },
+      {
+        id: "LBM-S011",
+        title: "Create docs/VOICE_COMMANDS.md",
+        notes: "User-facing voice input guide for the docs viewer. Covers how to use the mic button, browser support matrix, urgency/area keyword tables, and tips.",
+        lane: "newly-added-or-updated",
+        urgency: 3,
+        value: 5000,
+        priority: "P2",
+        area: "docs",
+        source: "user-requested",
+        recommendedBy: "",
+        references: ["docs/VOICE_COMMANDS.md"]
+      },
+      {
+        id: "LBM-S012",
+        title: "Update data/docs-content.js and data/project-data.js with new docs",
+        notes: "Add pre-rendered cache entries for AI_TASK_CREATION.md and VOICE_COMMANDS.md to docs-content.js. Add new docs and skills entries to project-data.js. Update cached CLAUDE.md and SKILL.md content to reflect new sections.",
+        lane: "newly-added-or-updated",
+        urgency: 3,
+        value: 5000,
+        priority: "P2",
+        area: "project-system",
+        source: "user-requested",
+        recommendedBy: "",
+        references: ["data/docs-content.js", "data/project-data.js"]
+      },
+      {
+        id: "LBM-S013",
+        title: "Update CLAUDE.md with task creation triggers and file map",
+        notes: "Add ADDING TASKS VIA AI section with trigger phrases and API reference. Update file map to include SKILL_ADD_TASK.md, CLAUDE_INTEGRATION_GUIDE.md, and new docs files.",
+        lane: "newly-added-or-updated",
+        urgency: 3,
+        value: 5000,
+        priority: "P2",
+        area: "docs",
+        source: "user-requested",
+        recommendedBy: "",
+        references: ["CLAUDE.md"]
       }
     ]
   },
   docs: [
+    {
+      title: "About",
+      summary: "What LBM is, who it's for, and the vision behind it.",
+      path: "docs/ABOUT.md"
+    },
     {
       title: "Setup Guide",
       summary: "First-time setup and customisation: get from zero to a working install in five minutes.",
@@ -419,6 +528,16 @@ window.MCCProjectData = {
       title: "Phase Handover Plan",
       summary: "Phased build plan with copy-paste prompts for each context window.",
       path: "PHASES.md"
+    },
+    {
+      title: "AI Task Creation",
+      summary: "How to add tasks via Claude Code or the browser console API. Trigger phrases, urgency/value/area inference, field reference, and example console commands.",
+      path: "docs/AI_TASK_CREATION.md"
+    },
+    {
+      title: "Voice Commands",
+      summary: "How to use the microphone button in the task creation form. Browser support, urgency/area keyword tables, and tips.",
+      path: "docs/VOICE_COMMANDS.md"
     }
   ],
   skills: [
@@ -436,6 +555,16 @@ window.MCCProjectData = {
       title: "Front-End Design Skill",
       summary: "Design reference for all CSS and UI work: type scale, spacing grid, color system, component patterns, motion rules, and accessibility — drawn from Linear, shadcn/ui, Material Design 3, and Apple HIG.",
       path: "DESIGN_SKILL.md"
+    },
+    {
+      title: "Add a Task via Claude",
+      summary: "Skill for creating LBM tasks from natural language during any Claude Code session. Covers trigger phrases, urgency/value/area inference rules, and the window.LBM.addTask() console command pattern.",
+      path: "SKILL_ADD_TASK.md"
+    },
+    {
+      title: "Claude Integration Guide",
+      summary: "How to use LBM alongside other development projects. Two-tab workflow, cross-project task logging via the console API, and rules for Claude when operating in a non-LBM session.",
+      path: "CLAUDE_INTEGRATION_GUIDE.md"
     }
   ]
 };

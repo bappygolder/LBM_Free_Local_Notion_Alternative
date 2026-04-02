@@ -107,7 +107,9 @@
 
     var raw = isCustom ? item.content : previewContent[item.path];
     if (raw) {
-      docPreview.innerHTML = renderMarkdown(raw);
+      // Strip leading H1 from built-in docs — the viewer header already shows item.title
+      var content = isCustom ? raw : raw.replace(/^# [^\n]*\n?/, "");
+      docPreview.innerHTML = renderMarkdown(content);
     } else {
       docPreview.innerHTML =
         "<p>No embedded preview is available for this file yet.</p>" +

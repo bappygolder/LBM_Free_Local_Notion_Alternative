@@ -19,7 +19,9 @@ Local Business Manager/
 ├── CLAUDE.md                  ← you are here (session bootstrap)
 ├── SKILL.md                   ← how to develop and extend the LBM
 ├── SKILL_ADD_SHORTCUT.md      ← use this when adding any keyboard shortcut
+├── SKILL_ADD_TASK.md          ← how to create tasks via Claude (AI task creation)
 ├── DESIGN_SKILL.md            ← design reference (read before any CSS/UI work)
+├── CLAUDE_INTEGRATION_GUIDE.md ← how to use LBM alongside other dev projects
 ├── PHASES.md                  ← phase handover guide with staged prompts
 ├── README.md                  ← setup + usage guide
 ├── index.html             ← main app (List + Board views)
@@ -32,10 +34,33 @@ Local Business Manager/
 ├── data/project-data.js        ← seed tasks, docs index, areas config
 ├── docs/                  ← LBM documentation
 │   ├── LOCAL_PROJECT_SYSTEM.md    ← tracker workflow guide
-│   └── PERSISTENCE_AND_STATE.md  ← data storage reference
+│   ├── PERSISTENCE_AND_STATE.md  ← data storage reference
+│   ├── AI_TASK_CREATION.md       ← AI + console API task creation guide
+│   └── VOICE_COMMANDS.md         ← voice input guide
 └── resources/             ← design assets
     └── README.md          ← how to add/manage resources
 ```
+
+---
+
+## ADDING TASKS VIA AI
+
+**Read `SKILL_ADD_TASK.md`** when the user says any of:
+- "Add this to the task board"
+- "Add to LBM: [description]"
+- "Create a task for X"
+- "Log this as a task"
+- "Track this in LBM"
+- "Make a task: X" / "LBM task: X"
+- "Put this on the board"
+
+The skill file tells you how to infer urgency/value/area from natural language and generate a `window.LBM.addTask({...})` browser console command.
+
+**Public API** (available in LBM browser console whenever `index.html` is open):
+- `window.LBM.addTask(taskObj)` — add a task; all fields optional except `title`
+- `window.LBM.getTasks()` — return a snapshot of all current tasks
+
+For using LBM alongside a different project (log tasks without switching workspaces), read `CLAUDE_INTEGRATION_GUIDE.md`.
 
 ---
 
