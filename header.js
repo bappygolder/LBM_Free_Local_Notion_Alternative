@@ -283,23 +283,41 @@
         return;
       }
 
-      // Up / Down / Home / End — navigate menu items; if on a swatch treat as idx -1
-      // so Down → first item, Up → last item (exits the swatch row naturally)
+      // Up / Down / Home / End — navigate menu items + attribution links
+      // Swatch row sits above all items (idx -1). Wrapping in either direction lands on first swatch.
       e.preventDefault();
       e.stopPropagation();
       var items = Array.prototype.slice.call(
-        dropdown.querySelectorAll(".app-menu-item, .app-toggle-switch[tabindex]")
+        dropdown.querySelectorAll(".app-menu-item, .app-toggle-switch[tabindex], a.app-menu-attr-link, a.app-menu-attr-github")
       ).filter(function (item) {
         return !item.closest("[hidden]") && item.offsetParent !== null;
       });
       if (!items.length) return;
+      var swatches = Array.prototype.slice.call(dropdown.querySelectorAll(".theme-swatch"));
+      var firstSwatch = swatches[0] || null;
       var idx = onSwatch ? -1 : items.indexOf(document.activeElement);
       if (e.key === "ArrowDown") {
-        idx = idx < items.length - 1 ? idx + 1 : 0;
+        if (idx < items.length - 1) {
+          idx = idx + 1;
+        } else {
+          // last item → wrap to swatch row
+          if (firstSwatch) firstSwatch.focus();
+          return;
+        }
       } else if (e.key === "ArrowUp") {
-        idx = idx > 0 ? idx - 1 : items.length - 1;
+        if (idx > 0) {
+          idx = idx - 1;
+        } else if (idx === 0) {
+          // first item → go up to swatch row
+          if (firstSwatch) firstSwatch.focus();
+          return;
+        } else {
+          // idx === -1: on a swatch, Up → last item (circular)
+          idx = items.length - 1;
+        }
       } else if (e.key === "Home") {
-        idx = 0;
+        if (firstSwatch) firstSwatch.focus();
+        return;
       } else if (e.key === "End") {
         idx = items.length - 1;
       }
@@ -373,6 +391,68 @@
     bindResetToggle("resetToggleTasks");
     bindResetToggle("resetToggleName");
     bindResetToggle("resetToggleSettings");
+
+    // ── Reset modal keyboard navigation ────────────────────────────────────────
+    // Up/Down: move between toggles and buttons.
+    // Left/Right: on a toggle → set off/on; on buttons → move between them.
+    // Tab/Shift+Tab: focus trap within the dialog.
+    if (overlay) {
+      overlay.addEventListener("keydown", function (e) {
+        if (overlay.hidden) return;
+
+        function getModalItems() {
+          return Array.prototype.slice.call(
+            overlay.querySelectorAll(".app-toggle-switch[tabindex], button:not([disabled])")
+          ).filter(function (el) { return el.offsetParent !== null; });
+        }
+
+        var items  = getModalItems();
+        var active = document.activeElement;
+        var idx    = items.indexOf(active);
+
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!items.length) return;
+          idx = e.key === "ArrowDown"
+            ? (idx < items.length - 1 ? idx + 1 : 0)
+            : (idx > 0 ? idx - 1 : items.length - 1);
+          items[idx].focus();
+          return;
+        }
+
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          e.preventDefault();
+          e.stopPropagation();
+          var isToggle = active && active.classList.contains("app-toggle-switch");
+          var isBtn    = active && active.tagName === "BUTTON";
+          if (isToggle) {
+            // Right = turn on, Left = turn off — only click if state needs to change
+            var wantOn = e.key === "ArrowRight";
+            if ((active.getAttribute("aria-checked") === "true") !== wantOn) active.click();
+          } else if (isBtn) {
+            var btns = items.filter(function (el) { return el.tagName === "BUTTON"; });
+            var bi = btns.indexOf(active);
+            if (bi !== -1) {
+              bi = e.key === "ArrowLeft"
+                ? (bi > 0 ? bi - 1 : btns.length - 1)
+                : (bi < btns.length - 1 ? bi + 1 : 0);
+              btns[bi].focus();
+            }
+          }
+          return;
+        }
+
+        if (e.key === "Tab") {
+          if (!items.length) return;
+          e.preventDefault();
+          idx = e.shiftKey
+            ? (idx > 0 ? idx - 1 : items.length - 1)
+            : (idx < items.length - 1 ? idx + 1 : 0);
+          items[idx].focus();
+        }
+      });
+    }
 
     btn.addEventListener("click", function (e) {
       e.stopPropagation();
@@ -664,8 +744,8 @@
           menuBtn.click();
           if (wasHidden && menuDd && !menuDd.hidden) {
             setTimeout(function () {
-              var firstItem = menuDd.querySelector(".app-menu-item");
-              if (firstItem) firstItem.focus();
+              var firstFocusable = menuDd.querySelector(".theme-swatch") || menuDd.querySelector(".app-menu-item");
+              if (firstFocusable) firstFocusable.focus();
             }, 0);
           }
         }

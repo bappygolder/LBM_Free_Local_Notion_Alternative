@@ -61,7 +61,7 @@
                 <path d="M10 11v6"/><path d="M14 11v6"/>
                 <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
               </svg>
-              Reset app
+              Reset this copy
             </button>
             <div class="app-menu-sep" role="separator"></div>
             <button class="app-menu-item app-menu-advanced-header" id="menuAdvancedToggle"
@@ -260,7 +260,7 @@
         <div class="shortcuts-row"><kbd>Cmd</kbd><kbd>Z</kbd><span>Undo (delete · lane change · title edit)</span></div>
       </div>
 
-      <div class="shortcuts-group">
+      <div class="shortcuts-group" hidden>
         <div class="shortcuts-group-title shortcuts-group-title--blue">List — Navigate &amp; Select</div>
         <div class="shortcuts-row"><kbd>↓</kbd><span>Focus next task</span></div>
         <div class="shortcuts-row"><kbd>↑</kbd><span>Focus previous task</span></div>
@@ -270,14 +270,14 @@
         <div class="shortcuts-row"><kbd>Esc</kbd><span>Clear selection</span></div>
       </div>
 
-      <div class="shortcuts-group">
+      <div class="shortcuts-group" hidden>
         <div class="shortcuts-group-title shortcuts-group-title--amber">List — Task Actions</div>
         <div class="shortcuts-row"><kbd>Shift</kbd><kbd>D</kbd><span>Delete focused task (Cmd+Z to undo)</span></div>
         <div class="shortcuts-row"><kbd>←</kbd><span>Restore deleted position</span></div>
         <div class="shortcuts-row"><kbd>→</kbd><span>Restore deleted position</span></div>
       </div>
 
-      <div class="shortcuts-group">
+      <div class="shortcuts-group" hidden>
         <div class="shortcuts-group-title shortcuts-group-title--purple">Multi-Select (List &amp; Board)</div>
         <div class="shortcuts-row"><kbd>Drag</kbd><span>Rubber-band select tasks</span></div>
         <div class="shortcuts-row"><kbd>Click</kbd><span>Toggle item in selection</span></div>
@@ -286,20 +286,20 @@
         <div class="shortcuts-row"><kbd>Esc</kbd><span>Clear selection</span></div>
       </div>
 
-      <div class="shortcuts-group">
+      <div class="shortcuts-group" hidden>
         <div class="shortcuts-group-title shortcuts-group-title--green">Detail Panel</div>
         <div class="shortcuts-row"><kbd>Shift</kbd><kbd>D</kbd><span>Delete this task (Cmd+Z to undo)</span></div>
         <div class="shortcuts-row"><kbd>Esc</kbd><span>Close panel</span></div>
       </div>
 
-      <div class="shortcuts-group">
+      <div class="shortcuts-group" hidden>
         <div class="shortcuts-group-title shortcuts-group-title--pink">Notes Editor</div>
         <div class="shortcuts-row"><kbd>Cmd</kbd><kbd>B</kbd><span>Bold</span></div>
         <div class="shortcuts-row"><kbd>Cmd</kbd><kbd>I</kbd><span>Italic</span></div>
         <div class="shortcuts-row"><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>8</kbd><span>Bullet list</span></div>
       </div>
 
-      <div class="shortcuts-group">
+      <div class="shortcuts-group" hidden>
         <div class="shortcuts-group-title shortcuts-group-title--yellow">Board View</div>
         <div class="shortcuts-row"><kbd>Enter</kbd><span>Save new task</span></div>
         <div class="shortcuts-row"><kbd>Esc</kbd><span>Cancel inline form</span></div>
@@ -320,12 +320,36 @@
         </svg>
       </div>
       <div class="reset-app-header">
-        <h2 class="reset-app-title" id="resetAppTitle">Reset app?</h2>
-        <p class="reset-app-sub">This will permanently delete all tasks, settings, and data. You'll start fresh with the default seed tasks. <strong>This cannot be undone.</strong></p>
+        <h2 class="reset-app-title" id="resetAppTitle">Reset this copy?</h2>
+        <p class="reset-app-sub">Choose what to reset. Other installations are not affected.</p>
       </div>
+      <div class="reset-dialog-toggles">
+        <label class="app-menu-toggle-row reset-toggle-row">
+          <span class="app-menu-toggle-label">Clear all entries</span>
+          <span class="app-toggle-switch" id="resetToggleTasks" role="switch"
+            aria-checked="true" tabindex="0" aria-label="Clear all entries">
+            <span class="app-toggle-thumb"></span>
+          </span>
+        </label>
+        <label class="app-menu-toggle-row reset-toggle-row">
+          <span class="app-menu-toggle-label">Reset workspace name</span>
+          <span class="app-toggle-switch" id="resetToggleName" role="switch"
+            aria-checked="false" tabindex="0" aria-label="Reset workspace name">
+            <span class="app-toggle-thumb"></span>
+          </span>
+        </label>
+        <label class="app-menu-toggle-row reset-toggle-row">
+          <span class="app-menu-toggle-label">Reset settings</span>
+          <span class="app-toggle-switch" id="resetToggleSettings" role="switch"
+            aria-checked="false" tabindex="0" aria-label="Reset settings">
+            <span class="app-toggle-thumb"></span>
+          </span>
+        </label>
+      </div>
+      <p class="reset-scope-note">This only affects this copy. Other installations are untouched.</p>
       <div class="reset-app-actions">
         <button class="ghost" id="resetAppCancelBtn" type="button">Cancel</button>
-        <button class="danger" id="resetAppConfirmBtn" type="button">Reset Everything</button>
+        <button class="danger" id="resetAppConfirmBtn" type="button">Reset</button>
       </div>
     </div>
   </div>
