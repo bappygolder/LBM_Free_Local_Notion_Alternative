@@ -33,29 +33,18 @@ Local Business Manager/
 ├── header.js              ← runs first; resolves storage key before task-app.js loads
 ├── data/docs-content.js        ← pre-rendered doc content cache
 ├── data/project-data.js        ← seed tasks, docs index, areas config
-├── docs/                  ← 16 documentation files (full list in data/project-data.js)
+├── docs/                  ← 17 documentation files (full list in data/project-data.js)
 └── resources/             ← design assets
     └── README.md          ← how to add/manage resources
 ```
 
 ---
 
-## ADDING TASKS VIA FILE (preferred — no browser required)
+## ADDING TASKS — READ SKILL_ADD_TASK.md FIRST
 
-When Claude Code is open in the LBM workspace, use the file-based method:
+**Always read `SKILL_ADD_TASK.md` before adding any task.** It contains the full inference rules, the 4-section description format, and the tag system.
 
-1. Read `data/tasks.json` to find the next unused ID.
-2. Append the new task object to the `tasks` array in `data/tasks.json`.
-3. Run `node scripts/sync-tasks.js` — merges tasks.json → project-data.js additively.
-4. Tell the user to reload the browser tab.
-
-**Read `SKILL_ADD_TASK.md` for the full inference rules and field constraints.**
-
----
-
-## ADDING TASKS VIA AI (browser console fallback)
-
-**Read `SKILL_ADD_TASK.md`** when the user says any of:
+**Trigger phrases** (any of these → read the skill and execute):
 - "Add this to the task board"
 - "Add to LBM: [description]"
 - "Create a task for X"
@@ -64,13 +53,47 @@ When Claude Code is open in the LBM workspace, use the file-based method:
 - "Make a task: X" / "LBM task: X"
 - "Put this on the board"
 
-The skill file tells you how to infer urgency/value/area from natural language and generate a `window.LBM.addTask({...})` browser console command (fallback when not in LBM workspace).
+### Preferred method — file-based (no browser required)
+
+1. Read `data/tasks.json` to find the next unused ID.
+2. Build the task object — including `description` (4-section format) and `tags` array.
+3. Append to the `tasks` array in `data/tasks.json`.
+4. Run `node scripts/sync-tasks.js`.
+5. Tell the user to reload the browser tab.
+
+### Fallback — browser console
+
+Generate a `window.LBM.addTask({...})` command and tell the user to paste it in the LBM tab's DevTools console.
 
 **Public API** (available in LBM browser console whenever `index.html` is open):
 - `window.LBM.addTask(taskObj)` — add a task; all fields optional except `title`
 - `window.LBM.getTasks()` — return a snapshot of all current tasks
 
-For using LBM alongside a different project (log tasks without switching workspaces), read `CLAUDE_INTEGRATION_GUIDE.md`.
+### Task description format (required)
+
+Every task must include a `description` with these four sections:
+
+```
+## What to do
+[AI-executable prompt — specific enough to start immediately]
+
+## Why it matters
+[What breaks or stalls without this task]
+
+## Why it's valuable
+[Revenue tier this serves: $1 / $10 / $100 / $1,000 / $1M]
+
+## Why it's urgent
+[What makes this time-sensitive now vs later]
+```
+
+### Tags (multi-tag array)
+
+Assign one or more: `marketing` · `monetization` · `ux` · `dev` · `efficiency` · `content` · `analytics` · `security` · `docs` · `release` · `product` · `platform`
+
+For full details and worked examples, see `SKILL_ADD_TASK.md`.
+
+For cross-project task logging (working in another codebase), read `CLAUDE_INTEGRATION_GUIDE.md`.
 
 ---
 
