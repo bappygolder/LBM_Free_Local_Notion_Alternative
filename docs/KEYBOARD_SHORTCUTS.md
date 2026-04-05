@@ -55,8 +55,8 @@ Works on every page.
 
 | Action | Key |
 |---|---|
-| Navigate to previous doc | `←` |
-| Navigate to next doc | `→` |
+| Navigate to previous doc | `↑` |
+| Navigate to next doc | `↓` |
 | Focus search | `S` |
 | Hide / show sidebar | Sidebar toolbar buttons |
 
@@ -76,6 +76,7 @@ Works on every page.
 | Scroll page down | `Shift+↓` |
 | Scroll page up | `Shift+↑` |
 | Open focused task | `Enter` |
+| Edit focused task inline (Tab between fields, Enter to save, Esc to cancel) | `Shift+Enter` |
 | Delete focused task (Cmd+Z to undo) | `Delete` · `⌫` · `Shift+D` |
 | Jump to last deleted position | `←` / `→` |
 | Increase list text size | `+` |

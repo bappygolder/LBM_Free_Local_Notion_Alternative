@@ -9,7 +9,7 @@ window.MCCProjectData = {
   },
   tracker: {
     storageKey: "ltm-task-tracker-v1",
-    seedVersion: "2026-03-30-r2",
+    seedVersion: "2026-04-05-sync",
     installToken: "lbm-2026-04-04-r1",
     recommendedByLabel: "Codex (GPT-5)",
     areas: [
@@ -23,238 +23,9 @@ window.MCCProjectData = {
     ],
     tasks: [
       {
-        id: "MCC-001",
-        title: "Replace copied tracker content with a Mac Control Center workspace",
-        notes:
-          "Remove foreign project references, rebuild the local tracker shell, and make this folder a reusable project-management layer for this repo.",
-        status: "done",
-        priority: "P0",
-        area: "project-system",
-        source: "user-requested",
-        recommendedBy: "",
-        references: ["docs/LOCAL_PROJECT_SYSTEM.md"]
-      },
-      {
-        id: "MCC-002",
-        title: "Create a clean documentation baseline for the project",
-        notes:
-          "Build a real docs index, architecture docs, release notes, persistence guide, and task-tracker workflow docs tailored to this app.",
-        status: "done",
-        priority: "P0",
-        area: "docs",
-        source: "user-requested",
-        recommendedBy: "",
-        references: ["../docs/README.md", "../docs/PROJECT_OVERVIEW.md"]
-      },
-      {
-        id: "MCC-003",
-        title: "Document how persistence works across app state and tracker state",
-        notes:
-          "Clarify what lives in config.json, what lives in UserDefaults, and what the browser tracker stores only in localStorage.",
-        status: "done",
-        priority: "P0",
-        area: "docs",
-        source: "user-requested",
-        recommendedBy: "",
-        references: ["docs/PERSISTENCE_AND_STATE.md"]
-      },
-      {
-        id: "MCC-004",
-        title: "Define the local-to-online tracker sync workflow",
-        notes:
-          "Choose the online system, decide whether the repo or the online tracker is the source of truth, and build a lightweight export/import habit before automation.",
-        status: "todo",
-        priority: "P1",
-        area: "project-system",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["docs/LOCAL_PROJECT_SYSTEM.md"]
-      },
-      {
-        id: "MCC-005",
-        title: "Add duplicate shortcut validation for action creation and editing",
-        notes:
-          "Prevent or warn on `Cmd + [Key]` conflicts so one action does not silently shadow another.",
-        status: "todo",
-        priority: "P1",
-        area: "product",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/ACTION_SYSTEM.md"]
-      },
-      {
-        id: "MCC-006",
-        title: "Add import, export, and reset controls for action config",
-        notes:
-          "Expose safe backup and restore flows for `config.json` from the app UI instead of requiring filesystem work.",
-        status: "todo",
-        priority: "P1",
-        area: "product",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/ACTION_SYSTEM.md", "docs/PERSISTENCE_AND_STATE.md"]
-      },
-      {
-        id: "MCC-007",
-        title: "Replace AppleScript launch-at-login with a modern macOS approach",
-        notes:
-          "Review ServiceManagement-based options and reduce brittleness around login items.",
-        status: "todo",
-        priority: "P1",
-        area: "platform",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/PROJECT_AUDIT.md"]
-      },
-      {
-        id: "MCC-008",
-        title: "Make the quick-launch dock user-configurable",
-        notes:
-          "The dock is currently hardcoded to Chrome, ChatGPT, and Telegram. Move that list into user-managed configuration.",
-        status: "todo",
-        priority: "P1",
-        area: "product",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../BEHAVIORS.md"]
-      },
-      {
-        id: "MCC-009",
-        title: "Improve action failure feedback beyond notifications only",
-        notes:
-          "Add inline error clarity, last-run status, or lightweight execution history so failures are easier to diagnose.",
-        status: "todo",
-        priority: "P1",
-        area: "product",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/UI_AND_UX_GUIDELINES.md"]
-      },
-      {
-        id: "MCC-010",
-        title: "Add a GitHub Actions smoke-build workflow",
-        notes:
-          "Run `./build.sh` on macOS in CI before adding release automation.",
-        status: "todo",
-        priority: "P2",
-        area: "release",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/RELEASE_AND_DEPLOYMENT.md"]
-      },
-      {
-        id: "MCC-011",
-        title: "Package and publish a repeatable release artifact",
-        notes:
-          "Decide whether the first public release should be a `.zip` or `.dmg`, then document and script the packaging flow.",
-        status: "todo",
-        priority: "P2",
-        area: "release",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/RELEASE_AND_DEPLOYMENT.md"]
-      },
-      {
-        id: "MCC-012",
-        title: "Define a trusted-command model for shell actions",
-        notes:
-          "Document what kinds of shell commands are expected, how users should store scripts, and how to avoid unsafe defaults in a public repo.",
-        status: "todo",
-        priority: "P2",
-        area: "security",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../SECURITY.md", "../docs/ACTION_SYSTEM.md"]
-      },
-      {
-        id: "MCC-013",
-        title: "Create screenshots and first-run onboarding docs",
-        notes:
-          "Capture the app modes and action setup flow so the repo is easier for future collaborators to understand quickly.",
-        status: "todo",
-        priority: "P2",
-        area: "docs",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/PROJECT_OVERVIEW.md"]
-      },
-      {
-        id: "MCC-014",
-        title: "Add config schema migration and backup planning",
-        notes:
-          "Before expanding settings and action metadata, decide how old config files will be migrated safely.",
-        status: "todo",
-        priority: "P2",
-        area: "platform",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["docs/PERSISTENCE_AND_STATE.md"]
-      },
-      {
-        id: "MCC-015",
-        title: "Review branding polish for iconography and status-item presentation",
-        notes:
-          "The app currently uses a text bolt in the menu bar. Consider a stronger asset and consistency pass after core product work stabilizes.",
-        status: "todo",
-        priority: "P3",
-        area: "ui-ux",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/UI_AND_UX_GUIDELINES.md"]
-      },
-      {
-        id: "MCC-016",
-        title: "Add basic automated coverage for config normalization and persistence",
-        notes:
-          "Even lightweight verification around `ConfigManager` would reduce regressions when action metadata grows.",
-        status: "todo",
-        priority: "P2",
-        area: "platform",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: ["../docs/APP_ARCHITECTURE.md"]
-      },
-      {
-        id: "MCC-017",
-        title: "Add due date field to tasks",
-        notes:
-          "The current task model has no deadline concept. A lightweight due date field would help prioritise time-sensitive work without overcomplicating the schema.",
-        lane: "newly-added-or-updated",
-        priority: "P2",
-        area: "product",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: []
-      },
-      {
-        id: "MCC-018",
-        title: "Add keyboard shortcuts: N to create, / to search, Esc to close",
-        notes:
-          "Basic hotkeys make the tracker feel native and reduce friction for power users. N opens the add-task modal, / focuses the search input, Esc dismisses any open modal.",
-        lane: "newly-added-or-updated",
-        priority: "P2",
-        area: "ui-ux",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: []
-      },
-      {
-        id: "MCC-019",
-        title: "Shorten export filenames and include date timestamp",
-        notes:
-          "Current filenames are long and generic. Switching to mcc-tracker-YYYY-MM-DD.json and mcc-tracker-YYYY-MM-DD.md makes exports easier to sort and identify.",
-        lane: "newly-added-or-updated",
-        priority: "P3",
-        area: "ui-ux",
-        source: "recommended",
-        recommendedBy: "Codex (GPT-5)",
-        references: []
-      },
-      {
         id: "LBM-003",
         title: "Allow the header icon to be customised by the user",
-        notes:
-          "The icon left of the project title is currently a hardcoded SVG. Let users swap it for an emoji, an uploaded image, or a preset icon — similar to how Notion lets you set a page icon. Store the selection in localStorage alongside the project name.",
+        notes: "The icon left of the project title is currently a hardcoded SVG. Let users swap it for an emoji, an uploaded image, or a preset icon — similar to how Notion lets you set a page icon. Store the selection in localStorage alongside the project name.",
         lane: "backlog",
         priority: "P2",
         area: "ui-ux",
@@ -315,7 +86,9 @@ window.MCCProjectData = {
         area: "product",
         source: "user-requested",
         recommendedBy: "Vision Roadmap",
-        references: ["docs/VISION_AND_PHILOSOPHY.md"]
+        references: [
+          "docs/VISION_AND_PHILOSOPHY.md"
+        ]
       },
       {
         id: "LBM-002",
@@ -326,7 +99,9 @@ window.MCCProjectData = {
         area: "product",
         source: "user-requested",
         recommendedBy: "Vision Roadmap",
-        references: ["docs/VISION_AND_PHILOSOPHY.md"]
+        references: [
+          "docs/VISION_AND_PHILOSOPHY.md"
+        ]
       },
       {
         id: "LBM-S001",
@@ -337,7 +112,9 @@ window.MCCProjectData = {
         area: "docs",
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
-        references: ["data/project-data.js"]
+        references: [
+          "data/project-data.js"
+        ]
       },
       {
         id: "LBM-S002",
@@ -348,7 +125,10 @@ window.MCCProjectData = {
         area: "docs",
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
-        references: ["README.md", "docs/SETUP_GUIDE.md"]
+        references: [
+          "README.md",
+          "docs/SETUP_GUIDE.md"
+        ]
       },
       {
         id: "LBM-S003",
@@ -370,7 +150,10 @@ window.MCCProjectData = {
         area: "docs",
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
-        references: ["README.md", "data/project-data.js"]
+        references: [
+          "README.md",
+          "data/project-data.js"
+        ]
       },
       {
         id: "LBM-S005",
@@ -381,7 +164,10 @@ window.MCCProjectData = {
         area: "docs",
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
-        references: ["SKILL.md", "SKILL_ADD_SHORTCUT.md"]
+        references: [
+          "SKILL.md",
+          "SKILL_ADD_SHORTCUT.md"
+        ]
       },
       {
         id: "LBM-S006",
@@ -394,7 +180,10 @@ window.MCCProjectData = {
         area: "product",
         source: "user-requested",
         recommendedBy: "",
-        references: ["task-app.js", "SKILL_ADD_TASK.md"]
+        references: [
+          "task-app.js",
+          "SKILL_ADD_TASK.md"
+        ]
       },
       {
         id: "LBM-S007",
@@ -407,7 +196,9 @@ window.MCCProjectData = {
         area: "docs",
         source: "user-requested",
         recommendedBy: "",
-        references: ["SKILL_ADD_TASK.md"]
+        references: [
+          "SKILL_ADD_TASK.md"
+        ]
       },
       {
         id: "LBM-S008",
@@ -420,7 +211,9 @@ window.MCCProjectData = {
         area: "docs",
         source: "user-requested",
         recommendedBy: "",
-        references: ["CLAUDE_INTEGRATION_GUIDE.md"]
+        references: [
+          "CLAUDE_INTEGRATION_GUIDE.md"
+        ]
       },
       {
         id: "LBM-S009",
@@ -433,7 +226,12 @@ window.MCCProjectData = {
         area: "ui-ux",
         source: "user-requested",
         recommendedBy: "",
-        references: ["task-app.js", "index.html", "styles.css", "docs/VOICE_COMMANDS.md"]
+        references: [
+          "task-app.js",
+          "index.html",
+          "styles.css",
+          "docs/VOICE_COMMANDS.md"
+        ]
       },
       {
         id: "LBM-S010",
@@ -446,7 +244,9 @@ window.MCCProjectData = {
         area: "docs",
         source: "user-requested",
         recommendedBy: "",
-        references: ["docs/AI_TASK_CREATION.md"]
+        references: [
+          "docs/AI_TASK_CREATION.md"
+        ]
       },
       {
         id: "LBM-S011",
@@ -459,7 +259,9 @@ window.MCCProjectData = {
         area: "docs",
         source: "user-requested",
         recommendedBy: "",
-        references: ["docs/VOICE_COMMANDS.md"]
+        references: [
+          "docs/VOICE_COMMANDS.md"
+        ]
       },
       {
         id: "LBM-S012",
@@ -472,7 +274,10 @@ window.MCCProjectData = {
         area: "project-system",
         source: "user-requested",
         recommendedBy: "",
-        references: ["data/docs-content.js", "data/project-data.js"]
+        references: [
+          "data/docs-content.js",
+          "data/project-data.js"
+        ]
       },
       {
         id: "LBM-S013",
@@ -485,9 +290,208 @@ window.MCCProjectData = {
         area: "docs",
         source: "user-requested",
         recommendedBy: "",
-        references: ["CLAUDE.md"]
+        references: [
+          "CLAUDE.md"
+        ]
+      },
+      {
+        id: "LBM-R001",
+        title: "Shortcut Management System — Phase 1: Registry + Settings UI",
+        notes: "Core differentiator. Central shortcut registry in localStorage, Settings UI panel to view/edit/reset any shortcut, live key combo recorder, and internal conflict detection. Full spec in docs/ROADMAP_SHORTCUTS.md. This is the single biggest planned feature for power-user acquisition.",
+        lane: "backlog",
+        urgency: 4,
+        value: 25000,
+        priority: "P1",
+        area: "product",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        references: [
+          "docs/ROADMAP_SHORTCUTS.md",
+          "SKILL_ADD_SHORTCUT.md"
+        ]
+      },
+      {
+        id: "LBM-R002",
+        title: "Add due date field with overdue visual indicator",
+        notes: "Single date field on the task model. Filter bar option for 'overdue'. Visual badge on task card and list row when past due. Keep it lightweight — plain date input is fine, no calendar picker needed. Planned feature from the product roadmap.",
+        lane: "backlog",
+        urgency: 3,
+        value: 10000,
+        priority: "P2",
+        area: "product",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        references: [
+          "docs/ROADMAP_PRODUCT.md"
+        ]
+      },
+      {
+        id: "LBM-R003",
+        title: "Set up public GitHub repo (lbm-free) and push v1",
+        notes: "Create the lbm-free public GitHub repo with MIT license. Clean .gitignore to exclude the private/ folder. Push current main branch. This is Phase 1 of the monetisation launch sequence — the waitlist CTA makes no sense until the repo is public.",
+        lane: "backlog",
+        urgency: 4,
+        value: 10000,
+        priority: "P1",
+        area: "release",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        references: [
+          "docs/INTERNAL_ROADMAP.md"
+        ]
+      },
+      {
+        id: "LBM-R004",
+        title: "Add 'LBM Cloud — coming soon' waitlist CTA in app",
+        notes: "Subtle CTA in the app footer or ⓘ info panel. Links to a Typeform or Google Form waitlist. Goal: 50+ signups to validate demand before building cloud features. Do not build Tier 2 without this signal first. Planned in the monetisation roadmap.",
+        lane: "backlog",
+        urgency: 3,
+        value: 10000,
+        priority: "P2",
+        area: "product",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        references: [
+          "docs/INTERNAL_ROADMAP.md",
+          "docs/ROADMAP_PRODUCT.md"
+        ]
+      },
+      {
+        id: "LBM-R005",
+        title: "Design and implement Supabase auth + task sync (Pro tier)",
+        notes: "Replace localStorage read/write with Supabase API calls. Add user_id and workspace_id to the task model. Use Supabase Auth for login/signup. The data shape is identical — only the persistence layer changes. Stage 1 of the Tier 2 backend plan.",
+        lane: "backlog",
+        urgency: 2,
+        value: 25000,
+        priority: "P2",
+        area: "platform",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        references: [
+          "docs/INTERNAL_ROADMAP.md"
+        ]
+      },
+      {
+        id: "LBM-R006",
+        title: "Resolve open product questions before Tier 2 build starts",
+        notes: "Four decisions must be locked before Pro development begins: (1) Paying user persona — solopreneur, small team, or agency? (2) Licence — MIT or AGPL for lbm-free? (3) Pricing model — subscription ($7–9/mo) or one-time ($49)? (4) Branding — keep 'LBM' or rename Pro to 'OBM'?",
+        lane: "backlog",
+        urgency: 3,
+        value: 5000,
+        priority: "P2",
+        area: "product",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        references: [
+          "docs/INTERNAL_ROADMAP.md",
+          "docs/ROADMAP_PRODUCT.md"
+        ]
+      },
+      {
+        id: "LBM-R007",
+        title: "Implement Stripe billing for Solo Pro tier ($7–9/month)",
+        notes: "Stripe Checkout + Billing Portal integration in lbm-pro. Solo Pro only at launch — no team tier yet. Keep it simple: one product, one price, one plan. Gate Pro features behind auth middleware. Only start after Supabase auth is working (LBM-R005).",
+        lane: "backlog",
+        urgency: 2,
+        value: 25000,
+        priority: "P3",
+        area: "platform",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        references: [
+          "docs/INTERNAL_ROADMAP.md"
+        ]
+      },
+      {
+        id: "LBM-C001",
+        title: "Build task search with keyboard-first filtering",
+        notes: "The current search filters visually but has no keyboard shortcut to focus it. Add / to jump to search, Escape to clear, and highlight matched text within task titles. This is a high-frequency interaction for power users and pays off fast.",
+        lane: "newly-added-or-updated",
+        urgency: 4,
+        value: 10000,
+        priority: "P1",
+        area: "ui-ux",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
+        references: [
+          "docs/KEYBOARD_SHORTCUTS.md"
+        ]
+      },
+      {
+        id: "LBM-C002",
+        title: "Add task activity log (who changed what and when)",
+        notes: "Every task edit currently overwrites lastModified with no history. Add a lightweight change log per task — stored in task.history as an array of {date, field, from, to} entries. Visible in the detail panel. Foundation for the Pro activity feed.",
+        lane: "newly-added-or-updated",
+        urgency: 3,
+        value: 10000,
+        priority: "P2",
+        area: "product",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
+        references: [
+          "docs/PERSISTENCE_AND_STATE.md"
+        ]
+      },
+      {
+        id: "LBM-C003",
+        title: "Add bulk lane-move action for multi-selected tasks",
+        notes: "Multi-select already works in list view. Extend it with a 'Move to lane' bulk action in the selection toolbar. A small dropdown lets you pick any active lane and moves all selected tasks at once. One undo entry covers the whole batch.",
+        lane: "newly-added-or-updated",
+        urgency: 3,
+        value: 10000,
+        priority: "P2",
+        area: "product",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
+        references: []
+      },
+      {
+        id: "LBM-C004",
+        title: "Remove legacy MCC seed tasks before public GitHub release",
+        notes: "Tasks MCC-001 through MCC-016 reference a macOS app (MacControlCenter) unrelated to LBM. Strip these from the seed data and replace with LBM-relevant examples. This must be done before the repo goes public or first-time visitors will be confused.",
+        lane: "newly-added-or-updated",
+        urgency: 4,
+        value: 5000,
+        priority: "P1",
+        area: "release",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
+        references: [
+          "data/project-data.js",
+          "data/tasks.json"
+        ]
+      },
+      {
+        id: "LBM-C005",
+        title: "Add mobile-responsive layout for list and board views",
+        notes: "The app is currently desktop-only. A responsive pass — collapsing the detail panel on small screens, stacking board columns vertically on mobile, and making the toolbar overflow gracefully — would open LBM to tablet and phone use without a native app.",
+        lane: "backlog",
+        urgency: 2,
+        value: 10000,
+        priority: "P3",
+        area: "ui-ux",
+        source: "recommended",
+        recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
+        references: [
+          "styles.css"
+        ]
       }
-    ]
+      ]
   },
   docs: [
     {
@@ -569,10 +573,10 @@ window.MCCProjectData = {
       lastUpdated: "2026-04-01"
     },
     {
-      title: "Product Roadmap",
-      summary: "Free vs paid strategy, GitHub repo structure, backend plan, tech stack, monetization tiers, the privatization plan, and open decisions log.",
-      path: "docs/INTERNAL_ROADMAP.md",
-      lastUpdated: "2026-04-03"
+      title: "File Sync System",
+      summary: "How tasks.json and the sync script work. The two ways tasks are added (browser UI vs Claude Code), how localStorage and seed data coexist, and the full tasks.json field reference.",
+      path: "docs/FILE_SYNC.md",
+      lastUpdated: "2026-04-05"
     }
   ],
   skills: [
@@ -616,9 +620,9 @@ window.MCCProjectData = {
     },
     {
       title: "Product Roadmap",
-      summary: "The three-tier product vision (Free / Pro / Business in a Box), technology principles, planned features, and open decisions.",
+      summary: "Three-tier product vision, technology principles, planned features, repo strategy, backend plan, tech stack, monetization tiers, privatization plan, and decisions log.",
       path: "docs/ROADMAP_PRODUCT.md",
-      lastUpdated: "2026-04-01"
+      lastUpdated: "2026-04-05"
     },
     {
       title: "Shortcut Management System",

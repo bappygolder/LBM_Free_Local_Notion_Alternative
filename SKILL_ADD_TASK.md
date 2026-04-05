@@ -4,6 +4,36 @@ Read this file fully before executing. This skill runs whenever the user wants t
 
 ---
 
+## PREFERRED METHOD: FILE-BASED (no browser required)
+
+Use this method when Claude Code is open in the LBM workspace. It requires no browser interaction.
+
+### Steps
+
+1. **Parse** the request using the inference tables below (urgency, value, area).
+2. **Show the draft** task to the user (same format as Step 5 below).
+3. **Write the task** to `data/tasks.json` — add the new task object to the `"tasks"` array. Assign a new ID following the existing convention (`LBM-XXX` or the next sequential ID). Do NOT set `id` to auto-generated values — pick the next unused one by scanning existing IDs in tasks.json.
+4. **Run the sync script**:
+   ```
+   node scripts/sync-tasks.js
+   ```
+5. **Tell the user**: "Task added. Reload the browser tab to see it."
+
+### Rules for tasks.json writes
+- Always read `data/tasks.json` first to see existing IDs before assigning a new one.
+- Default `lane` is `"newly-added-or-updated"` unless the user specifies otherwise.
+- Do NOT set `priority` — it is derived by `normalizeTask()` from `urgency`.
+- Do NOT set `lastModified` — auto-set by the app on first load.
+- `source` is `"user-requested"` for user tasks; `"recommended"` + `recommendedBy` when Claude is suggesting.
+
+---
+
+## FALLBACK METHOD: BROWSER CONSOLE
+
+Use this method when the browser is already open and Claude is not in the LBM workspace (e.g. cross-project usage).
+
+---
+
 ## TRIGGER PHRASES
 
 Any of the following starts a full run:

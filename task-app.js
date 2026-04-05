@@ -120,7 +120,7 @@
   let listManualOrder = [];
 
   // List view property display order — "name" marks title position; chips go before/after
-  let listPropOrder = ["name", "urgency", "value", "area"];
+  let listPropOrder = ["value", "name", "urgency", "area", "tags"];
 
   // Key of the settings prop row currently being dragged
   let settingsDragKey = null;
@@ -134,19 +134,48 @@
   let justAddedId = null;
 
   // Which properties to show on board cards
-  const DEFAULT_CARD_PROPS = { urgency: true, notes: true, value: false, area: false };
+  const DEFAULT_CARD_PROPS = { urgency: true, notes: true, value: false, area: false, tags: true };
   let cardVisibleProps = { ...DEFAULT_CARD_PROPS };
 
   // Which properties to show on list rows (and in the inline new form)
-  const DEFAULT_LIST_PROPS = { urgency: false, value: false, area: false };
+  const DEFAULT_LIST_PROPS = { urgency: false, value: true, area: false, tags: true };
   let listVisibleProps = { ...DEFAULT_LIST_PROPS };
 
   // Whether the toolbar icon group is collapsed
   let toolbarCollapsed = false;
 
   // Property display order and custom labels
-  const DEFAULT_PROP_ORDER  = ["value", "stage", "urgency", "area", "modified"];
-  const DEFAULT_PROP_LABELS = { stage: "Stage", urgency: "Urgency", value: "Dollar Value", area: "Area", modified: "Modified" };
+  const DEFAULT_PROP_ORDER  = ["value", "stage", "urgency", "area", "tags", "modified"];
+  const DEFAULT_PROP_LABELS = { stage: "Stage", urgency: "Urgency", value: "Dollar Value", area: "Area", tags: "Tags", modified: "Modified" };
+
+  // Tag system — predefined palette colors (index = color slot)
+  const TAG_COLORS = [
+    { bg: "rgba(139,92,246,0.18)",  border: "rgba(139,92,246,0.35)",  text: "#c4b5fd" }, // purple
+    { bg: "rgba(56,189,248,0.15)",  border: "rgba(56,189,248,0.3)",   text: "#7dd3fc" }, // sky
+    { bg: "rgba(52,211,153,0.15)",  border: "rgba(52,211,153,0.3)",   text: "#6ee7b7" }, // green
+    { bg: "rgba(251,191,36,0.15)",  border: "rgba(251,191,36,0.3)",   text: "#fde68a" }, // amber
+    { bg: "rgba(239,68,68,0.15)",   border: "rgba(239,68,68,0.3)",    text: "#fca5a5" }, // red
+    { bg: "rgba(251,113,133,0.15)", border: "rgba(251,113,133,0.3)",  text: "#fda4af" }, // rose
+    { bg: "rgba(74,222,128,0.15)",  border: "rgba(74,222,128,0.3)",   text: "#86efac" }, // lime
+    { bg: "rgba(251,146,60,0.15)",  border: "rgba(251,146,60,0.3)",   text: "#fdba74" }, // orange
+  ];
+
+  // Known tags registry: { [tagName]: colorIndex }
+  let tagRegistry = {};
+
+  function getTagColor(name) {
+    if (tagRegistry[name] === undefined) {
+      // Assign next available color slot (round-robin)
+      const usedIndices = Object.values(tagRegistry);
+      let idx = 0;
+      while (usedIndices.includes(idx) && idx < TAG_COLORS.length - 1) idx++;
+      tagRegistry[name] = idx % TAG_COLORS.length;
+    }
+    return TAG_COLORS[tagRegistry[name]];
+  }
+
+  // State: which tag dropdown is open (task id | null)
+  let openTagDropdownTaskId = null;
   let detailPropOrder  = [...DEFAULT_PROP_ORDER];
   let propLabels       = { ...DEFAULT_PROP_LABELS };
   let propDragSrcIdx   = null; // index of property row being dragged
@@ -275,6 +304,8 @@
     taskArea:           document.getElementById("taskArea"),
     taskSource:         document.getElementById("taskSource"),
     taskNotes:          document.getElementById("taskNotes"),
+    taskTagsInput:      document.getElementById("taskTagsInput"),
+    taskTagsWrap:       document.getElementById("taskTagsWrap"),
     submitButton:       document.getElementById("submitButton"),
     voiceMicBtn:        document.getElementById("voiceMicBtn"),
     cancelEditButton:   document.getElementById("cancelEditButton"),
@@ -331,7 +362,14 @@
     if (state.ui.listVisibleProps) listVisibleProps = Object.assign({}, DEFAULT_LIST_PROPS, state.ui.listVisibleProps);
     if (state.ui.activeFilter) activeFilter = state.ui.activeFilter;
     if (state.ui.toolbarCollapsed !== undefined) toolbarCollapsed = Boolean(state.ui.toolbarCollapsed);
-    if (Array.isArray(state.ui.detailPropOrder)) detailPropOrder = state.ui.detailPropOrder;
+    if (Array.isArray(state.ui.detailPropOrder)) {
+      detailPropOrder = state.ui.detailPropOrder;
+      if (!detailPropOrder.includes("tags")) {
+        const modIdx = detailPropOrder.indexOf("modified");
+        if (modIdx !== -1) detailPropOrder.splice(modIdx, 0, "tags");
+        else detailPropOrder.push("tags");
+      }
+    }
     if (state.ui.propLabels) propLabels = Object.assign({}, DEFAULT_PROP_LABELS, state.ui.propLabels);
     // Always enforce: "Dollar Value" label and "value" first in detail order
     propLabels.value = "Dollar Value";
@@ -352,7 +390,18 @@
     if (Array.isArray(state.ui.sortCriteriaOrder)) sortCriteriaOrder = state.ui.sortCriteriaOrder;
     if (state.ui.sortDirs) sortDirs = Object.assign({ urgency: "desc", value: "desc", modified: "desc" }, state.ui.sortDirs);
     if (Array.isArray(state.ui.listManualOrder)) listManualOrder = state.ui.listManualOrder;
-    if (Array.isArray(state.ui.listPropOrder) && state.ui.listPropOrder.includes("name")) listPropOrder = state.ui.listPropOrder;
+    if (Array.isArray(state.ui.listPropOrder) && state.ui.listPropOrder.includes("name")) {
+      listPropOrder = state.ui.listPropOrder;
+      // Ensure "tags" key is present
+      if (!listPropOrder.includes("tags")) listPropOrder.push("tags");
+    }
+    // Always enforce: "value" is first in listPropOrder
+    if (listPropOrder.includes("value") && listPropOrder[0] !== "value") {
+      listPropOrder = ["value", ...listPropOrder.filter(k => k !== "value")];
+    }
+    if (state.ui.tagRegistry && typeof state.ui.tagRegistry === "object") {
+      tagRegistry = Object.assign({}, state.ui.tagRegistry);
+    }
 
     // Re-register any custom lane keys saved in boardColumns so list view and
     // normalizeLane() can find them after a page reload.
@@ -379,6 +428,7 @@
     bindEvents();
     initLasso();
     render();
+    mergeNewSeedTasks();
 
     // Restore points: snapshot at session boundaries
     document.addEventListener("visibilitychange", function () {
@@ -408,9 +458,13 @@
           if (!LANE_LABELS[laneKey])           LANE_LABELS[laneKey] = col.label;
         });
       });
+      const existingTasks = Array.isArray(parsed.tasks)
+        ? parsed.tasks.map(normalizeTask)
+        : tracker.tasks.map(normalizeTask);
+
       return {
         seedVersion: parsed.seedVersion || "unknown",
-        tasks: Array.isArray(parsed.tasks) ? parsed.tasks.map(normalizeTask) : tracker.tasks.map(normalizeTask),
+        tasks: existingTasks,
         ui: parsed.ui || {}
       };
     } catch (_) {
@@ -447,11 +501,25 @@
         sortCriteriaOrder,
         sortDirs,
         listManualOrder,
-        listPropOrder
+        listPropOrder,
+        tagRegistry
       },
       savedAt: new Date().toISOString()
     }));
     maybeQueueSnapshot();
+  }
+
+  function mergeNewSeedTasks() {
+    try {
+      const existingIds = new Set(tasks.map(t => t.id));
+      const newFromSeed = tracker.tasks.filter(t => !existingIds.has(t.id));
+      if (newFromSeed.length === 0) return;
+      newFromSeed.map(normalizeTask).forEach(t => tasks.push(t));
+      writeState();
+      // Do NOT call render() — init() already rendered; a second render would flash the UI
+    } catch (_) {
+      // Never touch existing data on failure
+    }
   }
 
   /* ── Restore points ─────────────────────────────────────────────────────────── */
@@ -834,7 +902,8 @@
 
   function normalizeTask(t) {
     const priority = t.priority || urgencyToPriority(t.urgency || 3);
-    const urgency  = clamp(t.urgency || PRIORITY_TO_URGENCY[priority] || 3, 1, 5);
+    // 0 = "none" (hidden in UI); 1–5 = active urgency levels
+    const urgency  = t.urgency === 0 ? 0 : clamp(t.urgency || PRIORITY_TO_URGENCY[priority] || 3, 1, 5);
     const value    = Number.isFinite(Number(t.value)) ? Number(t.value) : (PRIORITY_TO_VALUE[priority] || 0);
     const lane     = normalizeLane(t);
 
@@ -851,6 +920,7 @@
       source:        t.source        || "user-requested",
       recommendedBy: t.recommendedBy || "",
       references:    Array.isArray(t.references) ? t.references : [],
+      tags:          Array.isArray(t.tags) ? t.tags : [],
       lastModified:  t.lastModified  || data.project.reviewedOn
     };
   }
@@ -1289,6 +1359,16 @@
           lastDeletedRowIndex = rows.indexOf(focused);
           focused.classList.remove("is-focused");
           confirmDelete(() => deleteTask(tid));
+          return;
+        }
+      }
+      // Shift+Enter — enter inline edit mode on the focused list row
+      if (e.key === "Enter" && e.shiftKey && activeView === "list") {
+        const focused = document.querySelector(".list-row.is-focused");
+        if (focused && focused._activateEditMode) {
+          e.preventDefault();
+          clearEnterHandler();
+          focused._activateEditMode();
           return;
         }
       }
@@ -2031,6 +2111,58 @@
     renderHiddenLists(filtered);
   }
 
+  // Animated re-render of the active list: FLIP rows to their new positions.
+  // highlightId — task id to keep selected/highlighted so user sees where it lands.
+  function renderListViewAnimated(filtered, highlightId) {
+    const active = filtered.filter(t => ACTIVE_LANES.includes(t.lane)).sort(sortTasks);
+    renderStats();
+    syncBarSortBtns();
+
+    // Snapshot current row positions (First)
+    const before = {};
+    el.taskList.querySelectorAll(".list-row[data-task-id]").forEach(row => {
+      before[row.dataset.taskId] = row.getBoundingClientRect().top;
+    });
+
+    // Rebuild DOM (Last)
+    el.taskList.innerHTML = "";
+    if (!active.length) {
+      el.taskList.innerHTML = '<div class="empty-state-group"><div class="empty-state"><span class="empty-state-text">No active tasks. Press <kbd class="kbd-key">N</kbd> to add one.</span><button class="empty-state-btn" onclick="document.dispatchEvent(new KeyboardEvent(\'keydown\', {key:\'n\', bubbles:true}))">+ New Task</button></div><div class="empty-state empty-state--secondary"><span class="empty-state-text">New here? Find out more about the application <a href="docs.html" class="empty-state-link">here</a>.</span></div></div>';
+    } else {
+      active.forEach(t => el.taskList.appendChild(buildListRow(t, true)));
+    }
+
+    // Mark the changed task as selected so it stands out
+    if (highlightId) {
+      selectedTaskIds.add(highlightId);
+      reapplySelection();
+    }
+
+    // FLIP — measure new positions, invert, then play forward
+    el.taskList.querySelectorAll(".list-row[data-task-id]").forEach(row => {
+      const id = row.dataset.taskId;
+      if (before[id] === undefined) return; // new row, no animation needed
+      const afterTop  = row.getBoundingClientRect().top;
+      const deltaY    = before[id] - afterTop;
+      if (Math.abs(deltaY) < 2) return; // didn't move, skip
+      // Invert: snap to old position instantly
+      row.style.transform  = `translateY(${deltaY}px)`;
+      row.style.transition = "none";
+      // Force reflow so the browser registers the starting position
+      // eslint-disable-next-line no-unused-expressions
+      row.offsetHeight;
+      // Play: animate to natural (new) position
+      row.style.transition = "transform 0.55s cubic-bezier(0.25, 1, 0.5, 1)";
+      row.style.transform  = "translateY(0)";
+      row.addEventListener("transitionend", () => {
+        row.style.transform  = "";
+        row.style.transition = "";
+      }, { once: true });
+    });
+
+    renderHiddenLists(filtered);
+  }
+
   function buildListRow(task, enableDrag = false) {
     const row = document.createElement("article");
     row.className = "list-row" + (DONE_LANES.includes(task.lane) ? " is-done" : "");
@@ -2150,10 +2282,11 @@
       });
     }
 
-    // Urgency dot
+    // Urgency dot — hidden (invisible) when urgency is 0
     const dot = document.createElement("span");
     dot.className = `list-urgency u-${task.urgency}`;
     dot.title = `Urgency ${task.urgency} / 5`;
+    if (task.urgency === 0) dot.style.visibility = "hidden";
 
     // Content — built in listPropOrder sequence so chips appear above/below the title
     const content = document.createElement("div");
@@ -2163,83 +2296,561 @@
     title.className = "list-title";
     title.textContent = task.title;
 
-    // Click on title: inline edit; propagation stopped so row click doesn't fire
-    title.addEventListener("click", e => {
-      e.stopPropagation();
-      if (content.querySelector(".list-title-input")) return; // already editing
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className = "list-title-input";
-      input.value = task.title;
+    // Activate inline title edit via contenteditable (cursor lands exactly where user clicked)
+    function activateTitleEdit() {
+      if (title.contentEditable === "true") return; // already editing
       const originalTitle = task.title;
-      title.style.display = "none";
-      content.insertBefore(input, title);
-      input.focus();
-      input.select();
+      title.contentEditable = "true";
+      title.focus();
+
+      // Place caret at end if no pointer event placed it
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) {
+        const range = document.createRange();
+        range.selectNodeContents(title);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+
       function commitTitle() {
-        const v = input.value.trim();
+        title.removeEventListener("keydown", onKeydown);
+        const v = (title.textContent || "").trim();
+        title.contentEditable = "false";
+        window.getSelection()?.removeAllRanges();
         if (v && v !== originalTitle) {
           pushUndo({ type: "title-edit", taskId: task.id, fromTitle: originalTitle, toTitle: v });
           tasks = tasks.map(t => t.id === task.id ? { ...t, title: v, lastModified: today() } : t);
           task = getTask(task.id) || task;
           writeState();
           title.textContent = v;
+        } else {
+          title.textContent = originalTitle; // revert if empty or unchanged
         }
-        input.remove();
-        title.style.display = "";
       }
-      function revertTitle() {
-        input.remove();
-        title.style.display = "";
+
+      function onKeydown(ke) {
+        if (ke.key === "Enter") {
+          ke.preventDefault();
+          title.removeEventListener("keydown", onKeydown);
+          document.removeEventListener("mousedown", onOutsideMousedown, true);
+          title.removeEventListener("blur", commitTitle);
+          commitTitle();
+        }
+        if (ke.key === "Escape") {
+          ke.preventDefault();
+          title.removeEventListener("keydown", onKeydown);
+          document.removeEventListener("mousedown", onOutsideMousedown, true);
+          title.removeEventListener("blur", commitTitle);
+          title.contentEditable = "false";
+          window.getSelection()?.removeAllRanges();
+          title.textContent = originalTitle;
+        }
       }
-      input.addEventListener("blur", commitTitle);
-      input.addEventListener("keydown", ke => {
-        if (ke.key === "Enter") { ke.preventDefault(); input.blur(); }
-        if (ke.key === "Escape") { ke.preventDefault(); input.removeEventListener("blur", commitTitle); revertTitle(); }
+      function onOutsideMousedown(e) {
+        if (!title.contains(e.target)) {
+          document.removeEventListener("mousedown", onOutsideMousedown, true);
+          title.removeEventListener("blur", commitTitle);
+          commitTitle();
+        }
+      }
+      document.addEventListener("mousedown", onOutsideMousedown, true);
+      title.addEventListener("blur", commitTitle, { once: true });
+      title.addEventListener("keydown", onKeydown);
+    }
+
+    // Expose title edit for Shift+Enter
+    row._activateTitleEdit = activateTitleEdit;
+
+    // Full inline edit mode — field-by-field focus.
+    // Only the focused field is editable; Tab/Shift+Tab cycles through fields then action buttons.
+    // Mouse click on any prop also enters this mode focused on that field.
+    // Escape reverts all changes. Outside click commits.
+    row._activateEditMode = function (startKey) {
+      if (row.classList.contains("is-row-editing")) {
+        // Already editing — jump to the requested field if specified
+        if (startKey) {
+          const slot = row.querySelector(`.list-row-field-slot[data-field="${startKey}"]`);
+          if (slot) { slot.focus(); return; }
+        }
+        return;
+      }
+      row.classList.add("is-row-editing");
+      row.classList.remove("is-focused");
+
+      // Snapshot originals for revert
+      const origTitle   = task.title;
+      const origUrgency = task.urgency;
+      const origValue   = task.value;
+      const origArea    = task.area;
+
+      // Live values — updated field-by-field as user edits
+      let draftTitle   = origTitle;
+      let draftUrgency = origUrgency;
+      let draftValue   = origValue;
+      let draftArea    = origArea;
+
+      // Build field slots for each editable prop key visible in this row.
+      // A slot is a <div tabIndex=0 data-field="key"> that swaps between chip display
+      // and live input when focused/blurred.
+      const fieldSlots = []; // [{key, el}]
+
+      function buildFieldSlot(key) {
+        if (key === "name") {
+          // Title slot — wraps the existing title element
+          const slot = document.createElement("div");
+          slot.className = "list-row-field-slot list-row-field-slot--title";
+          slot.dataset.field = "name";
+          slot.tabIndex = 0;
+
+          // Replace the standalone title with this slot
+          title.remove();
+          slot.appendChild(title);
+          return slot;
+        }
+
+        if (key === "urgency" && listVisibleProps.urgency) {
+          const slot = document.createElement("div");
+          slot.className = "list-row-field-slot";
+          slot.dataset.field = "urgency";
+          slot.tabIndex = 0;
+
+          const chipWrap = document.createElement("span");
+          chipWrap.className = "list-prop-urgency-wrap";
+          const chipLabel = document.createElement("span");
+          chipLabel.className = "list-prop-urgency-label";
+          chipLabel.textContent = "Urgency";
+          // 0 = none — show a muted "–" placeholder
+          const chipNum = document.createElement("span");
+          chipNum.className = `list-prop-urgency-num u-num-${draftUrgency}`;
+          chipNum.textContent = draftUrgency === 0 ? "–" : String(draftUrgency);
+          chipNum.title = "Click to cycle (0 = none)";
+          chipWrap.appendChild(chipLabel);
+          chipWrap.appendChild(chipNum);
+          slot.appendChild(chipWrap);
+
+          function bumpUrgency(e) {
+            e.stopPropagation();
+            draftUrgency = draftUrgency >= 5 ? 0 : draftUrgency + 1;
+            chipNum.textContent = draftUrgency === 0 ? "–" : String(draftUrgency);
+            chipNum.className = `list-prop-urgency-num u-num-${draftUrgency}`;
+            chipNum.classList.add("u-bump");
+            chipNum.addEventListener("animationend", () => chipNum.classList.remove("u-bump"), { once: true });
+          }
+
+          chipNum.addEventListener("click", bumpUrgency);
+          slot.addEventListener("keydown", ke => {
+            if (ke.key === "ArrowUp" || ke.key === "ArrowDown") {
+              ke.preventDefault();
+              ke.stopPropagation();
+              bumpUrgency(ke);
+            }
+          });
+
+          return slot;
+        }
+
+        if (key === "value" && listVisibleProps.value) {
+          const slot = document.createElement("div");
+          slot.className = "list-row-field-slot";
+          slot.dataset.field = "value";
+          slot.tabIndex = 0;
+
+          const chipEl = document.createElement("span");
+          chipEl.className = "list-prop-chip list-prop-value";
+          chipEl.textContent = draftValue ? `$${Number(draftValue).toLocaleString()}` : "Value $";
+          slot.appendChild(chipEl);
+
+          slot.addEventListener("focus", e => {
+            if (e.target !== slot) return; // ignore bubbled focus from inner input
+            const inp = document.createElement("input");
+            inp.type = "number"; inp.min = "0"; inp.step = "100";
+            inp.placeholder = "Dollar Value $";
+            inp.className = "list-prop-value-input list-row-field-input";
+            inp.value = draftValue || "";
+            inp.addEventListener("input", () => { draftValue = Number(inp.value) || 0; });
+            slot.innerHTML = "";
+            slot.appendChild(inp);
+            inp.focus();
+            inp.select();
+          });
+
+          slot.addEventListener("blur", e => {
+            if (slot.contains(e.relatedTarget)) return;
+            const inp = slot.querySelector("input");
+            if (inp) draftValue = Number(inp.value) || 0;
+            slot.innerHTML = "";
+            const c = document.createElement("span");
+            c.className = "list-prop-chip list-prop-value";
+            c.textContent = draftValue ? `$${Number(draftValue).toLocaleString()}` : "Value $";
+            slot.appendChild(c);
+          });
+
+          return slot;
+        }
+
+        if (key === "area" && listVisibleProps.area) {
+          const slot = document.createElement("div");
+          slot.className = "list-row-field-slot";
+          slot.dataset.field = "area";
+          slot.tabIndex = 0;
+
+          const chipEl = document.createElement("span");
+          chipEl.className = "list-prop-chip list-prop-area";
+          chipEl.textContent = (draftArea || "area").replace(/-/g, " ");
+          slot.appendChild(chipEl);
+
+          slot.addEventListener("focus", e => {
+            if (e.target !== slot) return; // ignore bubbled focus from inner select
+            const sel = document.createElement("select");
+            sel.className = "board-inline-new-select list-row-edit-select list-row-field-input";
+            tracker.areas.forEach(a => {
+              const opt = document.createElement("option");
+              opt.value = a; opt.textContent = a.replace(/-/g, " ");
+              if (a === draftArea) opt.selected = true;
+              sel.appendChild(opt);
+            });
+            sel.addEventListener("change", () => { draftArea = sel.value; });
+            slot.innerHTML = "";
+            slot.appendChild(sel);
+            sel.focus();
+          });
+
+          slot.addEventListener("blur", e => {
+            if (slot.contains(e.relatedTarget)) return;
+            const sel = slot.querySelector("select");
+            if (sel) draftArea = sel.value;
+            slot.innerHTML = "";
+            const c = document.createElement("span");
+            c.className = "list-prop-chip list-prop-area";
+            c.textContent = (draftArea || "area").replace(/-/g, " ");
+            slot.appendChild(c);
+          });
+
+          return slot;
+        }
+
+        return null;
+      }
+
+      // Rebuild prop rows using field slots instead of static chips.
+      // The title slot wraps the existing <h3> title element.
+      const nameIdx    = listPropOrder.indexOf("name");
+      const allKeys    = [...listPropOrder.slice(0, nameIdx), "name", ...listPropOrder.slice(nameIdx + 1)];
+
+      // Remove existing prop rows — we'll rebuild them
+      content.querySelectorAll(".list-prop-row").forEach(r => r.remove());
+      // Remove title from content (it gets wrapped in a slot)
+      if (title.parentNode === content) title.remove();
+
+      allKeys.forEach(key => {
+        const slot = buildFieldSlot(key);
+        if (!slot) return;
+        fieldSlots.push({ key, el: slot });
+        if (key === "name") {
+          // Title slot inline (no separate prop row)
+          content.appendChild(slot);
+          // Wire title contenteditable on slot focus
+          // Guard against recursion: only activate when the slot div itself received focus
+          slot.addEventListener("focus", e => {
+            if (e.target !== slot) return; // ignore bubbled focus from title
+            title.contentEditable = "true";
+            slot.classList.add("is-slot-active");
+            const range = document.createRange();
+            range.selectNodeContents(title);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            title.focus();
+          });
+          slot.addEventListener("blur", e => {
+            if (slot.contains(e.relatedTarget) || title === e.relatedTarget) return;
+            draftTitle = (title.textContent || "").trim() || origTitle;
+            title.contentEditable = "false";
+            title.textContent = draftTitle;
+            window.getSelection()?.removeAllRanges();
+            slot.classList.remove("is-slot-active");
+          });
+          title.addEventListener("blur", e => {
+            if (slot.contains(e.relatedTarget)) return;
+            draftTitle = (title.textContent || "").trim() || origTitle;
+            title.contentEditable = "false";
+            title.textContent = draftTitle;
+            window.getSelection()?.removeAllRanges();
+            slot.classList.remove("is-slot-active");
+          });
+        } else {
+          // Prop in its own row
+          const isAbove = nameIdx > listPropOrder.indexOf(key) || !listPropOrder.includes(key);
+          const propRow = document.createElement("div");
+          propRow.className = "list-prop-row" + (listPropOrder.indexOf(key) < nameIdx ? " list-prop-row--above" : "");
+          propRow.appendChild(slot);
+          if (isAbove) {
+            // Insert before the title slot
+            const titleSlot = content.querySelector(".list-row-field-slot--title");
+            if (titleSlot) content.insertBefore(propRow, titleSlot);
+            else content.appendChild(propRow);
+          } else {
+            content.appendChild(propRow);
+          }
+        }
       });
+
+      // Action buttons — already real <button> elements in `tools`; make them tabbable in edit mode
+      const actionButtons = [...tools.querySelectorAll("button")];
+      actionButtons.forEach(b => b.dataset.wasTabIndex = b.tabIndex);
+
+      // Full field order for Tab cycling: field slots + action buttons
+      const allTabTargets = [...fieldSlots.map(f => f.el), ...actionButtons];
+
+      function cleanup(revert) {
+        row.classList.remove("is-row-editing");
+        // Restore prop rows from chip state
+        content.querySelectorAll(".list-row-field-slot, .list-prop-row").forEach(r => r.remove());
+        // Put title back as standalone <h3>
+        title.contentEditable = "false";
+        title.textContent = revert ? origTitle : draftTitle;
+        content.appendChild(title);
+        // Re-append original prop chips (trigger a render)
+        window.getSelection()?.removeAllRanges();
+        actionButtons.forEach(b => { delete b.dataset.wasTabIndex; });
+        document.removeEventListener("keydown", onDocKeydown);
+        document.removeEventListener("mousedown", onOutsideClick, true);
+        document.removeEventListener("focusout", onFocusOut, true);
+      }
+
+      function commit() {
+        const newTitle   = draftTitle.trim();
+        const changed = newTitle && (newTitle !== origTitle || draftUrgency !== origUrgency || draftValue !== origValue || draftArea !== origArea);
+        cleanup(false);
+        if (changed) {
+          tasks = tasks.map(t => t.id === task.id
+            ? { ...t, title: newTitle || origTitle, urgency: draftUrgency, value: draftValue, area: draftArea, lastModified: today() }
+            : t);
+          task = getTask(task.id) || task;
+          writeState();
+        }
+        render();
+      }
+
+      function revert() {
+        cleanup(true);
+        render();
+      }
+
+      function onDocKeydown(ke) {
+        if (ke.key === "Escape") { ke.preventDefault(); revert(); return; }
+        if (ke.key === "Enter" && !ke.shiftKey) {
+          // Enter on action buttons is handled natively; Enter elsewhere commits
+          if (!document.activeElement.closest(".list-tools")) {
+            ke.preventDefault(); commit(); return;
+          }
+        }
+        if (ke.key === "Tab") {
+          ke.preventDefault();
+          // Find the current slot or button that contains focus
+          const focused = document.activeElement;
+          let curIdx = allTabTargets.findIndex(t => t === focused || t.contains(focused));
+          if (curIdx === -1) curIdx = 0;
+          const nextIdx = ke.shiftKey
+            ? (curIdx <= 0 ? allTabTargets.length - 1 : curIdx - 1)
+            : (curIdx >= allTabTargets.length - 1 ? 0 : curIdx + 1);
+          const next = allTabTargets[nextIdx];
+          next.focus();
+        }
+      }
+
+      function onOutsideClick(e) {
+        if (!row.contains(e.target)) commit();
+      }
+
+      function onFocusOut(e) {
+        // Commit when focus leaves the row entirely (e.g. click elsewhere)
+        if (!e.relatedTarget) return;
+        if (!row.contains(e.relatedTarget)) {
+          setTimeout(() => { if (!row.contains(document.activeElement)) commit(); }, 0);
+        }
+      }
+
+      document.addEventListener("keydown", onDocKeydown);
+      document.addEventListener("mousedown", onOutsideClick, true);
+      document.addEventListener("focusout", onFocusOut, true);
+
+      // Focus the requested start field, or the first field
+      const startSlot = startKey
+        ? fieldSlots.find(f => f.key === startKey)
+        : null;
+      const firstTarget = startSlot ? startSlot.el : (fieldSlots[0] ? fieldSlots[0].el : null);
+      if (firstTarget) firstTarget.focus();
+    };
+
+    // Track whether cursor is near the title (→ title-near) or over a prop-inline element (→ prop-near)
+    row.addEventListener("mousemove", e => {
+      const titleRect = title.getBoundingClientRect();
+      const pad = 6;
+      const nearTitle = e.clientX >= titleRect.left - pad && e.clientX <= titleRect.right  + pad &&
+                        e.clientY >= titleRect.top  - pad && e.clientY <= titleRect.bottom + pad;
+      row.classList.toggle("title-near", nearTitle);
+      const overProp = !!e.target.closest(".list-prop-inline");
+      row.classList.toggle("prop-near", overProp && !nearTitle);
+    });
+    row.addEventListener("mouseleave", () => {
+      row.classList.remove("title-near", "prop-near");
     });
 
-    // Build a chip element for a given prop key (returns null if disabled/empty)
+    // Build an inline-editable prop element for a given key.
     function buildPropChip(k) {
+
+      // ── Urgency: "Urgency" label + click-to-cycle badge ────────────────────────
+      // - Clicking cycles 1→2→3→4→5→0→1… with a bump animation
+      // - Sort order only updates when the mouse leaves the row (animated FLIP)
+      // - At urgency 0 the badge fades out slowly, then disappears on mouseleave
+      // - urgency 0 at page load = hidden (no element rendered)
       if (k === "urgency" && listVisibleProps.urgency) {
-        const c = document.createElement("span");
-        c.className = `list-prop-chip list-prop-urgency u-chip-${task.urgency}`;
-        c.textContent = `Urgency ${task.urgency}`;
-        return c;
+        if (task.urgency === 0) return null;
+
+        const wrap = document.createElement("span");
+        wrap.className = "list-prop-urgency-wrap list-prop-inline";
+
+        const label = document.createElement("span");
+        label.className = "list-prop-urgency-label";
+        label.textContent = "Urgency";
+
+        const num = document.createElement("span");
+        num.className = `list-prop-urgency-num u-num-${task.urgency}`;
+        num.textContent = String(task.urgency);
+        num.title = "Click to cycle urgency (1–5, 0 = none)";
+        num.tabIndex = 0;
+
+        // Track whether a deferred sort re-render is already queued
+        let sortPending = false;
+
+        function scheduleSortOnLeave() {
+          if (sortPending) return;
+          sortPending = true;
+          row.addEventListener("mouseleave", () => {
+            sortPending = false;
+            renderListViewAnimated(filteredTasks(), task.id);
+          }, { once: true });
+        }
+
+        function cycleUrgency(e) {
+          e.stopPropagation();
+          const next = task.urgency >= 5 ? 0 : task.urgency + 1;
+          tasks = tasks.map(t => t.id === task.id
+            ? { ...t, urgency: next, priority: urgencyToPriority(next), lastModified: today() }
+            : t);
+          task = getTask(task.id) || task;
+          writeState();
+
+          if (next === 0) {
+            // Show "0" briefly then fade the badge out slowly
+            num.textContent = "0";
+            num.className = "list-prop-urgency-num u-num-0";
+            num.classList.add("u-bump");
+            num.addEventListener("animationend", () => {
+              num.classList.remove("u-bump");
+              num.classList.add("u-fade-out");
+            }, { once: true });
+            // On mouseleave: full re-render (removes the element, re-sorts)
+            row.addEventListener("mouseleave", () => {
+              const filtered = filteredTasks();
+              renderListViewAnimated(filtered, task.id);
+            }, { once: true });
+          } else {
+            num.textContent = String(next);
+            num.className = `list-prop-urgency-num u-num-${next}`;
+            num.classList.add("u-bump");
+            num.addEventListener("animationend", () => num.classList.remove("u-bump"), { once: true });
+            scheduleSortOnLeave();
+          }
+        }
+
+        num.addEventListener("click", cycleUrgency);
+        num.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleUrgency(e); }
+        });
+
+        wrap.appendChild(label);
+        wrap.appendChild(num);
+        return wrap;
       }
+
+      // ── Value: pill chip (click to enter edit mode on value field) ────────────
       if (k === "value" && listVisibleProps.value && task.value) {
         const c = document.createElement("span");
-        c.className = "list-prop-chip list-prop-value";
+        c.className = "list-prop-chip list-prop-value list-prop-value-editable list-prop-inline";
         c.textContent = `$${Number(task.value).toLocaleString()}`;
+        c.title = "Click to edit value";
+
+        c.addEventListener("click", e => {
+          e.stopPropagation();
+          row._activateEditMode("value");
+        });
+
         return c;
       }
+
+      // ── Area: chip (click to enter edit mode on area field) ───────────────────
       if (k === "area" && listVisibleProps.area && task.area) {
         const c = document.createElement("span");
-        c.className = "list-prop-chip list-prop-area";
+        c.className = "list-prop-chip list-prop-area list-prop-inline";
         c.textContent = task.area.replace(/-/g, " ");
+        c.title = "Click to edit area";
+
+        c.addEventListener("click", e => {
+          e.stopPropagation();
+          row._activateEditMode("area");
+        });
+
         return c;
       }
+
+      // ── Tags: pills + inline + add button ─────────────────────────────────────
+      if (k === "tags" && listVisibleProps.tags && task.tags && task.tags.length) {
+        const wrap = document.createElement("span");
+        wrap.className = "list-prop-tags-wrap";
+        wrap.style.position = "relative";
+        task.tags.forEach(tag => wrap.appendChild(buildTagPill(tag, false)));
+
+        // + button — opens inline tag dropdown anchored to the wrap
+        const addBtn = document.createElement("span");
+        addBtn.className = "list-prop-tags-add";
+        addBtn.textContent = "+";
+        addBtn.title = "Add or remove tags";
+        addBtn.addEventListener("click", e => {
+          e.stopPropagation();
+          openInlineTagDropdown(wrap, task);
+        });
+        wrap.appendChild(addBtn);
+        return wrap;
+      }
+
       return null;
     }
 
-    // Chips before "name" → above title; chips after "name" → below title
+    // Each prop chip gets its own row — above title if before "name", below if after
     const nameIdx = listPropOrder.indexOf("name");
-    const aboveChips = listPropOrder.slice(0, nameIdx).map(buildPropChip).filter(Boolean);
-    const belowChips = listPropOrder.slice(nameIdx + 1).map(buildPropChip).filter(Boolean);
+    const aboveKeys = listPropOrder.slice(0, nameIdx);
+    const belowKeys = listPropOrder.slice(nameIdx + 1);
 
-    if (aboveChips.length) {
-      const row = document.createElement("div");
-      row.className = "list-prop-row list-prop-row--above";
-      aboveChips.forEach(c => row.appendChild(c));
-      content.appendChild(row);
-    }
+    aboveKeys.forEach(k => {
+      const chip = buildPropChip(k);
+      if (!chip) return;
+      const propRow = document.createElement("div");
+      propRow.className = "list-prop-row list-prop-row--above";
+      propRow.appendChild(chip);
+      content.appendChild(propRow);
+    });
     content.appendChild(title);
-    if (belowChips.length) {
-      const row = document.createElement("div");
-      row.className = "list-prop-row";
-      belowChips.forEach(c => row.appendChild(c));
-      content.appendChild(row);
-    }
+    belowKeys.forEach(k => {
+      const chip = buildPropChip(k);
+      if (!chip) return;
+      const propRow = document.createElement("div");
+      propRow.className = "list-prop-row";
+      propRow.appendChild(chip);
+      content.appendChild(propRow);
+    });
 
     // Hover tools — single group on the right: delete | edit | done
     const tools = document.createElement("div");
@@ -2272,10 +2883,17 @@
     row.appendChild(content);
     row.appendChild(tools);
 
-    // Click anywhere on row (except title) opens detail panel, or toggles selection
-    row.addEventListener("click", () => {
+    // Click on row: if near the title → enter edit mode on title field;
+    // prop-inline elements handle their own clicks via stopPropagation;
+    // anything else → open detail panel.
+    row.addEventListener("click", e => {
       if (selectedTaskIds.size > 0) { toggleTaskSelection(task.id); return; }
-      // Clear stale keyboard focus and Enter handler before opening via mouse
+      if (row.classList.contains("is-row-editing")) return;
+      if (e.target.closest(".list-prop-inline, .list-prop-tags-add")) return;
+      if (row.classList.contains("title-near")) {
+        row._activateEditMode("name");
+        return;
+      }
       clearEnterHandler();
       document.querySelectorAll(".list-row.is-focused").forEach(r => r.classList.remove("is-focused"));
       openDetail(task.id);
@@ -2559,7 +3177,7 @@
     const topLeft = document.createElement("div");
     topLeft.className = "board-card-top-left";
 
-    if (cardVisibleProps.urgency) {
+    if (cardVisibleProps.urgency && task.urgency > 0) {
       const dot = document.createElement("span");
       dot.className = `list-urgency u-${task.urgency}`;
       dot.title = `Urgency ${task.urgency} / 5`;
@@ -2578,6 +3196,10 @@
       chip.className = "card-prop-chip";
       chip.textContent = task.area;
       topLeft.appendChild(chip);
+    }
+
+    if (cardVisibleProps.tags && task.tags && task.tags.length) {
+      task.tags.forEach(tag => topLeft.appendChild(buildTagPill(tag, false)));
     }
 
     const tools = document.createElement("div");
@@ -2995,13 +3617,22 @@
       case "urgency": {
         const sel = document.createElement("select");
         sel.className = "detail-prop-select";
-        for (let u = 1; u <= 5; u++) {
+        // 0 = none (hidden in list/board), 1–5 = active levels
+        const urgencyOptions = [
+          [0, "0 — None"],
+          [1, "1 — Low"],
+          [2, "2"],
+          [3, "3 — Medium"],
+          [4, "4 — High"],
+          [5, "5 — Critical"],
+        ];
+        urgencyOptions.forEach(([u, label]) => {
           const opt = document.createElement("option");
           opt.value = String(u);
-          opt.textContent = u === 1 ? "1 — Low" : u === 3 ? "3 — Medium" : u === 5 ? "5 — Critical" : String(u);
+          opt.textContent = label;
           if (u === t.urgency) opt.selected = true;
           sel.appendChild(opt);
-        }
+        });
         sel.addEventListener("change", () => {
           const newUrgency = Number(sel.value);
           tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { urgency: newUrgency, priority: urgencyToPriority(newUrgency), lastModified: today() }) : x);
@@ -3041,6 +3672,10 @@
           writeState(); render();
         });
         container.appendChild(sel);
+        break;
+      }
+      case "tags": {
+        buildDetailTagEditor(container, t);
         break;
       }
       case "modified":
@@ -3125,6 +3760,7 @@
         ["notes",   "Notes preview",                () => cardVisibleProps.notes,   v => { cardVisibleProps.notes   = v; }],
         ["value",   propLabels.value   || "Dollar Value",  () => cardVisibleProps.value,   v => { cardVisibleProps.value   = v; }],
         ["area",    propLabels.area    || "Area",   () => cardVisibleProps.area,    v => { cardVisibleProps.area    = v; }],
+        ["tags",    propLabels.tags    || "Tags",   () => cardVisibleProps.tags,    v => { cardVisibleProps.tags    = v; }],
       ].forEach(([, label, getVal, setVal]) => {
         const row = document.createElement("label");
         row.className = "toggle-item";
@@ -3401,8 +4037,8 @@
   /* ── List view size scale ───────────────────────────────────────────────────── */
 
   function applyListSize(level, showToast) {
-    const labels = ["Compact", "Small", "Default", "Large", "Extra Large"];
-    const clamped = Math.max(-2, Math.min(2, level));
+    const labels = ["Ultra Compact", "Compact", "Small", "Default", "Large", "XL", "2XL", "3XL", "Huge"];
+    const clamped = Math.max(-3, Math.min(5, level));
     listSizeLevel = clamped;
     if (clamped === 0) {
       el.taskList.removeAttribute("data-list-size");
@@ -3410,7 +4046,7 @@
       el.taskList.setAttribute("data-list-size", String(clamped));
     }
     localStorage.setItem("lbm_listSize", String(clamped));
-    if (showToast) showUndoToast("List size: " + labels[clamped + 2]);
+    if (showToast) showUndoToast("List size: " + labels[clamped + 3]);
   }
 
   function showUndoToast(message) {
@@ -3476,7 +4112,17 @@
 
   function openListInlineNew() {
     const existing = document.getElementById("list-inline-new");
-    if (existing) { existing.remove(); return; } // toggle off
+    if (existing) {
+      // Toggle off — animate out rather than snap-remove
+      if (existing.classList.contains("is-closing")) return;
+      existing.style.maxHeight = existing.getBoundingClientRect().height + "px";
+      existing.getBoundingClientRect(); // force reflow
+      existing.classList.add("is-closing");
+      const onDone = () => { existing.remove(); render(); };
+      existing.addEventListener("transitionend", onDone, { once: true });
+      setTimeout(onDone, 200);
+      return;
+    }
 
     // Remove empty-state placeholder so the form sits at top
     const empty = el.taskList.querySelector(".empty-state");
@@ -3603,9 +4249,15 @@
     (aboveInputs.length ? aboveInputs[0] : titleInput).focus();
 
     function dismiss() {
-      form.remove();
       document.removeEventListener("mousedown", outsideClickHandler);
-      render();
+      form.style.maxHeight = form.getBoundingClientRect().height + "px";
+      // Force a reflow so the browser registers the explicit max-height before we collapse it
+      form.getBoundingClientRect(); // eslint-disable-line no-unused-expressions
+      form.classList.add("is-closing");
+      const onDone = () => { form.remove(); render(); };
+      form.addEventListener("transitionend", onDone, { once: true });
+      // Safety fallback in case transitionend doesn't fire (e.g. prefers-reduced-motion)
+      setTimeout(onDone, 200);
     }
 
     function outsideClickHandler(e) {
@@ -3707,19 +4359,340 @@
       el.taskArea.value    = task.area;
       el.taskSource.value  = task.source;
       el.taskNotes.value   = task.notes || "";
+      if (el.taskTagsInput) renderModalTagPills(task.tags || []);
     } else {
       el.taskForm.reset();
       el.taskLane.value    = defaultLane || "newly-added-or-updated";
       el.taskUrgency.value = "3";
       el.taskArea.value    = "project-system";
       el.taskSource.value  = "user-requested";
+      if (el.taskTagsInput) renderModalTagPills([]);
     }
+  }
+
+  /* ── Modal tag pill input ─────────────────────────────────────────────────── */
+
+  function renderModalTagPills(tags) {
+    if (!el.taskTagsWrap) return;
+    // Store current tags on the hidden input (comma separated)
+    el.taskTagsInput.value = tags.join(",");
+    // Rebuild pill display
+    const wrap = el.taskTagsWrap;
+    wrap.innerHTML = "";
+
+    tags.forEach(tag => {
+      const pill = buildTagPill(tag, true);
+      const x = document.createElement("span");
+      x.className = "tag-pill-remove";
+      x.innerHTML = "×";
+      x.addEventListener("click", e => {
+        e.stopPropagation();
+        const cur = el.taskTagsInput.value.split(",").map(s => s.trim()).filter(Boolean);
+        renderModalTagPills(cur.filter(t => t !== tag));
+      });
+      pill.appendChild(x);
+      wrap.appendChild(pill);
+    });
+
+    // "Add tag" input
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.placeholder = tags.length ? "Add tag…" : "Add a tag…";
+    inp.className = "tag-add-input";
+    inp.autocomplete = "off";
+
+    // Autocomplete dropdown
+    inp.addEventListener("input", () => renderTagSuggestions(inp));
+    inp.addEventListener("keydown", e => {
+      if ((e.key === "Enter" || e.key === ",") && inp.value.trim()) {
+        e.preventDefault();
+        addModalTag(inp.value.trim().replace(/,/g, ""));
+      }
+      if (e.key === "Backspace" && !inp.value && tags.length) {
+        // Remove last tag on backspace when input is empty
+        const cur = el.taskTagsInput.value.split(",").map(s => s.trim()).filter(Boolean);
+        renderModalTagPills(cur.slice(0, -1));
+      }
+      if (e.key === "Escape") closeSuggestionDropdown();
+    });
+    inp.addEventListener("blur", () => {
+      if (inp.value.trim()) addModalTag(inp.value.trim().replace(/,/g, ""));
+      setTimeout(closeSuggestionDropdown, 150);
+    });
+    inp.addEventListener("focus", () => renderTagSuggestions(inp));
+    wrap.appendChild(inp);
+  }
+
+  function addModalTag(name) {
+    if (!name) return;
+    const cur = el.taskTagsInput.value.split(",").map(s => s.trim()).filter(Boolean);
+    if (cur.includes(name)) {
+      renderModalTagPills(cur); // re-render to clear input
+      return;
+    }
+    getTagColor(name); // register color
+    renderModalTagPills([...cur, name]);
+    writeState(); // persist tagRegistry
+  }
+
+  let _suggestionDropdown = null;
+  function closeSuggestionDropdown() {
+    if (_suggestionDropdown) { _suggestionDropdown.remove(); _suggestionDropdown = null; }
+  }
+
+  function renderTagSuggestions(inp) {
+    closeSuggestionDropdown();
+    const q = inp.value.trim().toLowerCase();
+    const allTags = Object.keys(tagRegistry);
+    const cur = el.taskTagsInput.value.split(",").map(s => s.trim()).filter(Boolean);
+    const matches = allTags.filter(t => t.toLowerCase().includes(q) && !cur.includes(t));
+    if (!matches.length) return;
+
+    const dd = document.createElement("div");
+    dd.className = "tag-suggestion-dropdown";
+    _suggestionDropdown = dd;
+    matches.forEach(tag => {
+      const item = document.createElement("div");
+      item.className = "tag-suggestion-item";
+      const pill = buildTagPill(tag, false);
+      item.appendChild(pill);
+      item.addEventListener("mousedown", e => {
+        e.preventDefault();
+        addModalTag(tag);
+        inp.focus();
+      });
+      dd.appendChild(item);
+    });
+    inp.parentNode.appendChild(dd);
+  }
+
+  /* ── Detail panel inline tag editor ─────────────────────────────────────── */
+
+  function buildDetailTagEditor(container, t) {
+    container.innerHTML = "";
+    container.style.position = "relative";
+    const tags = Array.isArray(t.tags) ? t.tags : [];
+
+    const pillsRow = document.createElement("div");
+    pillsRow.className = "detail-tag-pills";
+
+    tags.forEach(tag => {
+      const pill = buildTagPill(tag, true);
+      const x = document.createElement("span");
+      x.className = "tag-pill-remove";
+      x.innerHTML = "×";
+      x.title = "Remove tag";
+      x.addEventListener("click", e => {
+        e.stopPropagation();
+        const newTags = t.tags.filter(tg => tg !== tag);
+        tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { tags: newTags, lastModified: today() }) : x);
+        writeState(); render();
+        if (detailTaskId === t.id) refreshDetailProps(getTask(t.id));
+      });
+      pill.appendChild(x);
+      pillsRow.appendChild(pill);
+    });
+
+    // "+ Add tag" trigger
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "detail-tag-add-btn";
+    addBtn.textContent = tags.length ? "+" : "+ Add tag";
+    addBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      openDetailTagDropdown(container, t, addBtn);
+    });
+    pillsRow.appendChild(addBtn);
+    container.appendChild(pillsRow);
+  }
+
+  // Inline tag dropdown for list view + button — same UX as the detail panel dropdown
+  // but anchored below the tags wrap in the list row, without opening the detail panel.
+  function openInlineTagDropdown(anchorEl, t) {
+    // Close any already-open inline tag dropdown
+    document.querySelectorAll(".list-tag-dropdown").forEach(d => d.remove());
+
+    const dd = document.createElement("div");
+    dd.className = "detail-tag-dropdown list-tag-dropdown";
+
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "detail-tag-search";
+    inp.placeholder = "Search or create tag…";
+    dd.appendChild(inp);
+
+    const list = document.createElement("div");
+    list.className = "detail-tag-list";
+    dd.appendChild(list);
+
+    function renderList(q) {
+      list.innerHTML = "";
+      const allTags = Object.keys(tagRegistry);
+      const cur = Array.isArray(t.tags) ? t.tags : [];
+      const matches = allTags.filter(tg => tg.toLowerCase().includes(q.toLowerCase()));
+
+      matches.forEach(tag => {
+        const item = document.createElement("div");
+        item.className = "detail-tag-list-item" + (cur.includes(tag) ? " is-selected" : "");
+        const check = document.createElement("span");
+        check.className = "detail-tag-check";
+        check.innerHTML = cur.includes(tag)
+          ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+          : "";
+        const pill = buildTagPill(tag, false);
+        item.appendChild(check);
+        item.appendChild(pill);
+        item.addEventListener("mousedown", e => {
+          e.preventDefault();
+          const freshTask = getTask(t.id) || t;
+          const freshCur = Array.isArray(freshTask.tags) ? freshTask.tags : [];
+          const newTags = freshCur.includes(tag)
+            ? freshCur.filter(tg => tg !== tag)
+            : [...freshCur, tag];
+          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { tags: newTags, lastModified: today() }) : x);
+          writeState();
+          render();
+          // Reopen so user can keep toggling without the dropdown disappearing
+          // Brief delay so render() completes and the new wrap element exists
+          setTimeout(() => {
+            const newWrap = document.querySelector(`.list-row[data-task-id="${t.id}"] .list-prop-tags-wrap`);
+            if (newWrap) openInlineTagDropdown(newWrap, getTask(t.id) || t);
+          }, 30);
+        });
+        list.appendChild(item);
+      });
+
+      if (q && !allTags.some(tg => tg.toLowerCase() === q.toLowerCase())) {
+        const cur2 = Array.isArray(t.tags) ? t.tags : [];
+        const create = document.createElement("div");
+        create.className = "detail-tag-list-item detail-tag-create";
+        create.innerHTML = `<span class="detail-tag-check"></span><span class="detail-tag-create-label">Create <strong>${q}</strong></span>`;
+        create.addEventListener("mousedown", e => {
+          e.preventDefault();
+          getTagColor(q);
+          const newTags = [...cur2, q];
+          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { tags: newTags, lastModified: today() }) : x);
+          writeState();
+          render();
+          dd.remove();
+        });
+        list.appendChild(create);
+      }
+    }
+
+    renderList("");
+    inp.addEventListener("input", () => renderList(inp.value));
+    inp.addEventListener("keydown", e => { if (e.key === "Escape") dd.remove(); });
+
+    setTimeout(() => {
+      function onOutside(e) {
+        if (!dd.contains(e.target) && !anchorEl.contains(e.target)) {
+          dd.remove();
+          document.removeEventListener("mousedown", onOutside, true);
+        }
+      }
+      document.addEventListener("mousedown", onOutside, true);
+    }, 0);
+
+    anchorEl.appendChild(dd);
+    inp.focus();
+  }
+
+  function openDetailTagDropdown(container, t, anchor) {
+    // Close any existing dropdown
+    document.querySelectorAll(".detail-tag-dropdown").forEach(d => d.remove());
+
+    const dd = document.createElement("div");
+    dd.className = "detail-tag-dropdown";
+
+    // Search input
+    const inp = document.createElement("input");
+    inp.type = "text";
+    inp.className = "detail-tag-search";
+    inp.placeholder = "Search or create tag…";
+    dd.appendChild(inp);
+
+    const list = document.createElement("div");
+    list.className = "detail-tag-list";
+    dd.appendChild(list);
+
+    function renderList(q) {
+      list.innerHTML = "";
+      const allTags = Object.keys(tagRegistry);
+      const cur = Array.isArray(t.tags) ? t.tags : [];
+      const matches = allTags.filter(tg => tg.toLowerCase().includes(q.toLowerCase()));
+
+      matches.forEach(tag => {
+        const item = document.createElement("div");
+        item.className = "detail-tag-list-item" + (cur.includes(tag) ? " is-selected" : "");
+        const check = document.createElement("span");
+        check.className = "detail-tag-check";
+        check.innerHTML = cur.includes(tag)
+          ? `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+          : "";
+        const pill = buildTagPill(tag, false);
+        item.appendChild(check);
+        item.appendChild(pill);
+        item.addEventListener("mousedown", e => {
+          e.preventDefault();
+          let newTags;
+          if (cur.includes(tag)) {
+            newTags = cur.filter(tg => tg !== tag);
+          } else {
+            newTags = [...cur, tag];
+          }
+          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { tags: newTags, lastModified: today() }) : x);
+          writeState(); render();
+          if (detailTaskId === t.id) refreshDetailProps(getTask(t.id));
+          dd.remove();
+        });
+        list.appendChild(item);
+      });
+
+      // "Create tag" option when query doesn't match existing
+      if (q && !allTags.some(tg => tg.toLowerCase() === q.toLowerCase())) {
+        const cur2 = Array.isArray(t.tags) ? t.tags : [];
+        const create = document.createElement("div");
+        create.className = "detail-tag-list-item detail-tag-create";
+        create.innerHTML = `<span class="detail-tag-check"></span><span class="detail-tag-create-label">Create <strong>${q}</strong></span>`;
+        create.addEventListener("mousedown", e => {
+          e.preventDefault();
+          getTagColor(q);
+          const newTags = [...cur2, q];
+          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { tags: newTags, lastModified: today() }) : x);
+          writeState(); render();
+          if (detailTaskId === t.id) refreshDetailProps(getTask(t.id));
+          dd.remove();
+        });
+        list.appendChild(create);
+      }
+    }
+
+    renderList("");
+    inp.addEventListener("input", () => renderList(inp.value));
+    inp.addEventListener("keydown", e => { if (e.key === "Escape") dd.remove(); });
+
+    // Close on outside click
+    setTimeout(() => {
+      function onOutside(e) {
+        if (!dd.contains(e.target) && e.target !== anchor) {
+          dd.remove();
+          document.removeEventListener("mousedown", onOutside, true);
+        }
+      }
+      document.addEventListener("mousedown", onOutside, true);
+    }, 0);
+
+    container.appendChild(dd);
+    inp.focus();
   }
 
   function closeTaskModal() {
     el.taskModal.hidden = true;
     editingId = null;
     el.taskForm.reset();
+    if (el.taskTagsWrap) el.taskTagsWrap.innerHTML = "";
+    closeSuggestionDropdown();
     if (el.voiceMicBtn) el.voiceMicBtn.classList.remove("is-listening", "is-error");
   }
 
@@ -3808,6 +4781,14 @@
     const priority = urgencyToPriority(urgency);
     const lane     = el.taskLane.value;
 
+    // Parse tags from modal input
+    const rawTags = el.taskTagsInput ? el.taskTagsInput.value.split(",").map(s => s.trim()).filter(Boolean) : [];
+    const existingTags = editingId ? (getTask(editingId)?.tags || []) : [];
+    // Merge: keep existing tags not removed, add new ones
+    const finalTags = rawTags.length > 0 ? rawTags : existingTags;
+    // Register any new tags
+    finalTags.forEach(tag => getTagColor(tag));
+
     const nextTask = {
       id:            editingId || createId(),
       title,
@@ -3821,6 +4802,7 @@
       source:        el.taskSource.value,
       recommendedBy: el.taskSource.value === "recommended" ? (tracker.recommendedByLabel || "") : "",
       references:    editingId ? (getTask(editingId)?.references || []) : [],
+      tags:          finalTags,
       lastModified:  today()
     };
 
@@ -4086,7 +5068,8 @@
     if (u >= 5) return "P0";
     if (u >= 4) return "P1";
     if (u >= 3) return "P2";
-    return "P3";
+    if (u >= 1) return "P3";
+    return "P3"; // 0 = none, treat as lowest priority
   }
 
   function download(name, content, type) {
@@ -4097,6 +5080,17 @@
     a.click();
     a.remove();
     URL.revokeObjectURL(a.href);
+  }
+
+  /* ── Tag helpers ────────────────────────────────────────────────────────────── */
+
+  function buildTagPill(name, interactive) {
+    const c = getTagColor(name);
+    const span = document.createElement("span");
+    span.className = "tag-pill" + (interactive ? " tag-pill--interactive" : "");
+    span.textContent = name;
+    span.style.cssText = `background:${c.bg};border-color:${c.border};color:${c.text};`;
+    return span;
   }
 
   function makeIconBtn(label, svg, handler) {

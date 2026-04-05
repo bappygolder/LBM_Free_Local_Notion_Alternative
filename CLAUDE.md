@@ -33,14 +33,27 @@ Local Business Manager/
 ├── header.js              ← runs first; resolves storage key before task-app.js loads
 ├── data/docs-content.js        ← pre-rendered doc content cache
 ├── data/project-data.js        ← seed tasks, docs index, areas config
-├── docs/                  ← 17 documentation files (full list in data/project-data.js)
+├── docs/                  ← 16 documentation files (full list in data/project-data.js)
 └── resources/             ← design assets
     └── README.md          ← how to add/manage resources
 ```
 
 ---
 
-## ADDING TASKS VIA AI
+## ADDING TASKS VIA FILE (preferred — no browser required)
+
+When Claude Code is open in the LBM workspace, use the file-based method:
+
+1. Read `data/tasks.json` to find the next unused ID.
+2. Append the new task object to the `tasks` array in `data/tasks.json`.
+3. Run `node scripts/sync-tasks.js` — merges tasks.json → project-data.js additively.
+4. Tell the user to reload the browser tab.
+
+**Read `SKILL_ADD_TASK.md` for the full inference rules and field constraints.**
+
+---
+
+## ADDING TASKS VIA AI (browser console fallback)
 
 **Read `SKILL_ADD_TASK.md`** when the user says any of:
 - "Add this to the task board"
@@ -51,7 +64,7 @@ Local Business Manager/
 - "Make a task: X" / "LBM task: X"
 - "Put this on the board"
 
-The skill file tells you how to infer urgency/value/area from natural language and generate a `window.LBM.addTask({...})` browser console command.
+The skill file tells you how to infer urgency/value/area from natural language and generate a `window.LBM.addTask({...})` browser console command (fallback when not in LBM workspace).
 
 **Public API** (available in LBM browser console whenever `index.html` is open):
 - `window.LBM.addTask(taskObj)` — add a task; all fields optional except `title`

@@ -26,13 +26,15 @@ Claude reads `SKILL_ADD_TASK.md`, infers urgency/value/area from context, and ge
 
 **Urgency:**
 
-| What you say | Urgency |
-|---|---|
-| "critical", "blocker", "ASAP", "emergency" | 5 — Critical |
-| "important", "high priority", "soon" | 4 — High |
-| (no cue) | 3 — Medium |
-| "when I get to it", "someday", "low priority" | 2 — Low |
-| "nice to have", "optional", "minor" | 1 — Minimal |
+| What you say | Urgency | Color |
+|---|---|---|
+| "critical", "blocker", "ASAP", "emergency" | 5 — Critical | Red |
+| "important", "high priority", "soon" | 4 — High | Orange-red |
+| (no cue) | 3 — Medium | Muted red |
+| "when I get to it", "someday", "low priority" | 2 — Low | Warm gray |
+| "nice to have", "optional", "minor" | 1 — Minimal | Gray |
+
+The urgency dot and badge use a gray-to-red color scale: 1 is gray, each step adds more red, 5 is full red. After 5 the cycle resets to 1.
 
 **Dollar value:**
 

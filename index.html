@@ -563,6 +563,11 @@
             </select>
           </div>
           <div class="field full">
+            <label>Tags</label>
+            <div class="tag-input-field" id="taskTagsWrap"></div>
+            <input type="hidden" id="taskTagsInput" name="taskTagsInput">
+          </div>
+          <div class="field full">
             <label for="taskNotes">Quick note</label>
             <textarea id="taskNotes" name="taskNotes" placeholder="Keep it short and action-oriented."></textarea>
           </div>
@@ -625,6 +630,7 @@
 
       <div class="shortcuts-group">
         <div class="shortcuts-group-title shortcuts-group-title--amber">List — Task Actions</div>
+        <div class="shortcuts-row"><kbd>Shift</kbd><kbd>Enter</kbd><span>Edit focused task inline</span></div>
         <div class="shortcuts-row"><kbd>Shift</kbd><kbd>D</kbd><span>Delete focused task (Cmd+Z to undo)</span></div>
         <div class="shortcuts-row"><kbd>←</kbd><span>Restore deleted position</span></div>
         <div class="shortcuts-row"><kbd>→</kbd><span>Restore deleted position</span></div>

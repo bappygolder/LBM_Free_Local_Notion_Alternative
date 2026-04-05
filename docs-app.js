@@ -155,7 +155,7 @@
   if (sidebarHideBtn) sidebarHideBtn.addEventListener("click", function () { setSidebarCollapsed(true); });
   if (sidebarRevealBtn) sidebarRevealBtn.addEventListener("click", function () { setSidebarCollapsed(false); });
 
-  // ── Keyboard shortcuts: S = focus search  |  ← → = prev/next doc ─────────────
+  // ── Keyboard shortcuts: S = focus search  |  ↑ ↓ = prev/next doc ─────────────
 
   document.addEventListener("keydown", function (e) {
     var tag = document.activeElement ? document.activeElement.tagName : "";
@@ -170,15 +170,15 @@
       return;
     }
 
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
 
     var all = allItems().filter(function (item) { return item._button && item._button.style.display !== "none"; });
     if (!all.length || !currentItem) return;
 
     var idx = all.indexOf(currentItem);
     var target = null;
-    if (e.key === "ArrowLeft" && idx > 0) target = all[idx - 1];
-    else if (e.key === "ArrowRight" && idx < all.length - 1) target = all[idx + 1];
+    if (e.key === "ArrowUp" && idx > 0) target = all[idx - 1];
+    else if (e.key === "ArrowDown" && idx < all.length - 1) target = all[idx + 1];
 
     if (target) {
       e.preventDefault();
