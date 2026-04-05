@@ -107,20 +107,17 @@
   // List view sort: "criteria" | "manual"
   let listSort = "manual";
 
-  // Multi-level sort criteria order (all three always active, in priority order)
-  let sortCriteriaOrder = ["urgency", "value", "modified"];
+  // Active sort criteria in priority order — only user-added entries (may be empty)
+  let sortCriteriaOrder = [];
 
   // Sort direction per criterion: "desc" = high/newest first, "asc" = low/oldest first
-  let sortDirs = { urgency: "desc", value: "desc", modified: "desc" };
-
-  // Which criterion's direction sub-row is currently expanded in the sort panel
-  let sortExpandedKey = null;
+  let sortDirs = { urgency: "desc", effort: "desc", value: "desc", modified: "desc" };
 
   // Manual sort order for list view — array of task IDs (active tasks only)
   let listManualOrder = [];
 
   // List view property display order — "name" marks title position; chips go before/after
-  let listPropOrder = ["value", "name", "urgency", "area", "tags"];
+  let listPropOrder = ["value", "name", "urgency", "effort", "area", "tags"];
 
   // Key of the settings prop row currently being dragged
   let settingsDragKey = null;
@@ -134,19 +131,19 @@
   let justAddedId = null;
 
   // Which properties to show on board cards
-  const DEFAULT_CARD_PROPS = { urgency: true, notes: true, value: false, area: false, tags: true };
+  const DEFAULT_CARD_PROPS = { urgency: true, notes: true, effort: false, value: false, area: false, tags: true };
   let cardVisibleProps = { ...DEFAULT_CARD_PROPS };
 
   // Which properties to show on list rows (and in the inline new form)
-  const DEFAULT_LIST_PROPS = { urgency: false, value: true, area: false, tags: true };
+  const DEFAULT_LIST_PROPS = { urgency: true, effort: true, value: true, area: false, tags: true };
   let listVisibleProps = { ...DEFAULT_LIST_PROPS };
 
   // Whether the toolbar icon group is collapsed
   let toolbarCollapsed = false;
 
   // Property display order and custom labels
-  const DEFAULT_PROP_ORDER  = ["value", "stage", "urgency", "area", "tags", "modified"];
-  const DEFAULT_PROP_LABELS = { stage: "Stage", urgency: "Urgency", value: "Dollar Value", area: "Area", tags: "Tags", modified: "Modified" };
+  const DEFAULT_PROP_ORDER  = ["value", "stage", "urgency", "effort", "area", "tags", "modified"];
+  const DEFAULT_PROP_LABELS = { stage: "Stage", urgency: "Urgency", effort: "Effort", value: "Dollar Value", area: "Area", tags: "Tags", modified: "Last Updated" };
 
   // Tag system — predefined palette colors (index = color slot)
   const TAG_COLORS = [
@@ -158,6 +155,12 @@
     { bg: "rgba(251,113,133,0.15)", border: "rgba(251,113,133,0.3)",  text: "#fda4af" }, // rose
     { bg: "rgba(74,222,128,0.15)",  border: "rgba(74,222,128,0.3)",   text: "#86efac" }, // lime
     { bg: "rgba(251,146,60,0.15)",  border: "rgba(251,146,60,0.3)",   text: "#fdba74" }, // orange
+    { bg: "rgba(236,72,153,0.15)",  border: "rgba(236,72,153,0.3)",   text: "#f9a8d4" }, // pink
+    { bg: "rgba(148,163,184,0.15)", border: "rgba(148,163,184,0.3)",  text: "#cbd5e1" }, // slate
+  ];
+
+  const TAG_COLOR_LABELS = [
+    "Purple", "Sky", "Green", "Amber", "Red", "Rose", "Lime", "Orange", "Pink", "Slate"
   ];
 
   // Known tags registry: { [tagName]: colorIndex }
@@ -172,6 +175,31 @@
       tagRegistry[name] = idx % TAG_COLORS.length;
     }
     return TAG_COLORS[tagRegistry[name]];
+  }
+
+  function renameTagGlobally(oldName, newName) {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return false;
+    if (tagRegistry[trimmed] !== undefined) return false; // name collision
+    tagRegistry[trimmed] = tagRegistry[oldName];
+    delete tagRegistry[oldName];
+    tasks = tasks.map(t =>
+      Array.isArray(t.tags) && t.tags.includes(oldName)
+        ? Object.assign({}, t, { tags: t.tags.map(tg => tg === oldName ? trimmed : tg), lastModified: today() })
+        : t
+    );
+    writeState(); render();
+    return true;
+  }
+
+  function deleteTagGlobally(tagName) {
+    delete tagRegistry[tagName];
+    tasks = tasks.map(t =>
+      Array.isArray(t.tags) && t.tags.includes(tagName)
+        ? Object.assign({}, t, { tags: t.tags.filter(tg => tg !== tagName), lastModified: today() })
+        : t
+    );
+    writeState(); render();
   }
 
   // State: which tag dropdown is open (task id | null)
@@ -300,6 +328,7 @@
     taskTitle:          document.getElementById("taskTitle"),
     taskLane:           document.getElementById("taskLane"),
     taskUrgency:        document.getElementById("taskUrgency"),
+    taskEffort:         document.getElementById("taskEffort"),
     taskValue:          document.getElementById("taskValue"),
     taskArea:           document.getElementById("taskArea"),
     taskSource:         document.getElementById("taskSource"),
@@ -360,6 +389,14 @@
     detailMode     = state.ui.detailMode   || "side";
     if (state.ui.cardVisibleProps) cardVisibleProps = Object.assign({}, DEFAULT_CARD_PROPS, state.ui.cardVisibleProps);
     if (state.ui.listVisibleProps) listVisibleProps = Object.assign({}, DEFAULT_LIST_PROPS, state.ui.listVisibleProps);
+    // One-time migration: upgrade existing users to show effort in list view by default
+    if (state.ui.listVisibleProps && state.ui.listVisibleProps.effort === false && !state.ui._effortVisUpgraded) {
+      listVisibleProps.effort = true;
+    }
+    // One-time migration: enable urgency in list view by default for existing users
+    if (state.ui.listVisibleProps && state.ui.listVisibleProps.urgency === false && !state.ui._urgencyVisUpgraded) {
+      listVisibleProps.urgency = true;
+    }
     if (state.ui.activeFilter) activeFilter = state.ui.activeFilter;
     if (state.ui.toolbarCollapsed !== undefined) toolbarCollapsed = Boolean(state.ui.toolbarCollapsed);
     if (Array.isArray(state.ui.detailPropOrder)) {
@@ -368,6 +405,15 @@
         const modIdx = detailPropOrder.indexOf("modified");
         if (modIdx !== -1) detailPropOrder.splice(modIdx, 0, "tags");
         else detailPropOrder.push("tags");
+      }
+      if (!detailPropOrder.includes("effort")) {
+        const areaIdx = detailPropOrder.indexOf("area");
+        if (areaIdx !== -1) detailPropOrder.splice(areaIdx, 0, "effort");
+        else {
+          const tagsIdx = detailPropOrder.indexOf("tags");
+          if (tagsIdx !== -1) detailPropOrder.splice(tagsIdx, 0, "effort");
+          else detailPropOrder.push("effort");
+        }
       }
     }
     if (state.ui.propLabels) propLabels = Object.assign({}, DEFAULT_PROP_LABELS, state.ui.propLabels);
@@ -380,20 +426,23 @@
     if (state.ui.listSort) {
       // Backwards compat: old single-key values → criteria mode with that key first
       if (["urgency", "value", "modified"].includes(state.ui.listSort)) {
-        listSort = "criteria";
         const k = state.ui.listSort;
-        sortCriteriaOrder = [k, ...["urgency", "value", "modified"].filter(x => x !== k)];
+        sortCriteriaOrder = [k, ...["urgency", "effort", "value", "modified"].filter(x => x !== k)];
       } else {
         listSort = state.ui.listSort;
       }
     }
     if (Array.isArray(state.ui.sortCriteriaOrder)) sortCriteriaOrder = state.ui.sortCriteriaOrder;
-    if (state.ui.sortDirs) sortDirs = Object.assign({ urgency: "desc", value: "desc", modified: "desc" }, state.ui.sortDirs);
+    // Derive listSort from sortCriteriaOrder — source of truth
+    listSort = sortCriteriaOrder.length > 0 ? "criteria" : "manual";
+    if (state.ui.sortDirs) sortDirs = Object.assign({ urgency: "desc", effort: "desc", value: "desc", modified: "desc" }, state.ui.sortDirs);
     if (Array.isArray(state.ui.listManualOrder)) listManualOrder = state.ui.listManualOrder;
     if (Array.isArray(state.ui.listPropOrder) && state.ui.listPropOrder.includes("name")) {
       listPropOrder = state.ui.listPropOrder;
       // Ensure "tags" key is present
       if (!listPropOrder.includes("tags")) listPropOrder.push("tags");
+      // Ensure "effort" key is present
+      if (!listPropOrder.includes("effort")) listPropOrder.push("effort");
     }
     // Always enforce: "value" is first in listPropOrder
     if (listPropOrder.includes("value") && listPropOrder[0] !== "value") {
@@ -502,7 +551,9 @@
         sortDirs,
         listManualOrder,
         listPropOrder,
-        tagRegistry
+        tagRegistry,
+        _effortVisUpgraded: true,
+        _urgencyVisUpgraded: true
       },
       savedAt: new Date().toISOString()
     }));
@@ -613,6 +664,17 @@
       if (diff < 7 * 86400000)   return Math.floor(diff / 86400000) + "d ago";
       return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
         " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    } catch (_) {
+      return isoString;
+    }
+  }
+
+  function formatDisplayDate(isoString) {
+    if (!isoString) return "—";
+    try {
+      var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      var parts = isoString.slice(0, 10).split("-"); // ["YYYY", "MM", "DD"]
+      return parseInt(parts[2], 10) + " " + months[parseInt(parts[1], 10) - 1] + " " + parts[0];
     } catch (_) {
       return isoString;
     }
@@ -907,6 +969,8 @@
     const value    = Number.isFinite(Number(t.value)) ? Number(t.value) : (PRIORITY_TO_VALUE[priority] || 0);
     const lane     = normalizeLane(t);
 
+    const effort  = clamp(Number(t.effort) || 5, 1, 10);
+
     return {
       id:            t.id || createId(),
       title:         t.title || "Untitled Task",
@@ -914,6 +978,7 @@
       body:          t.body  || "",   // rich-text HTML from detail panel editor
       lane,
       urgency,
+      effort,
       value,
       priority,
       area:          t.area          || "project-system",
@@ -921,7 +986,9 @@
       recommendedBy: t.recommendedBy || "",
       references:    Array.isArray(t.references) ? t.references : [],
       tags:          Array.isArray(t.tags) ? t.tags : [],
-      lastModified:  t.lastModified  || data.project.reviewedOn
+      lastModified:  t.lastModified  || data.project.reviewedOn,
+      customProps:   (t.customProps && typeof t.customProps === "object" && !Array.isArray(t.customProps))
+                       ? t.customProps : {}
     };
   }
 
@@ -1021,62 +1088,81 @@
     el.sortToggle.addEventListener("click", e => { e.stopPropagation(); toggleSortPanel(); });
     el.sortPanel.addEventListener("click", e => {
       // Prevent document-level close handler from seeing this click.
-      // renderSortPanel() replaces innerHTML so e.target becomes detached;
-      // without stopPropagation the contains() check fails and closes the panel.
       e.stopPropagation();
 
-      // Reset button
-      if (e.target.closest("[data-sort-reset]")) {
-        listSort = "manual";
-        sortExpandedKey = null;
+      // × Remove a criterion by index
+      const removeBtn = e.target.closest("[data-sort-remove]");
+      if (removeBtn) {
+        const idx = parseInt(removeBtn.dataset.sortRemove, 10);
+        sortCriteriaOrder.splice(idx, 1);
+        listSort = sortCriteriaOrder.length > 0 ? "criteria" : "manual";
         writeState();
-        renderSortPanel();
-        attachSortCriteriaDrag();
+        syncSortPanel();
         render();
         return;
       }
-      // Manual order row
-      if (e.target.closest("[data-sort-manual]")) {
-        listSort = "manual";
-        sortExpandedKey = null;
+
+      // + Add sort — pick first available field
+      if (e.target.closest("[data-sort-add]")) {
+        const taken = new Set(sortCriteriaOrder);
+        const next = ["urgency", "effort", "value", "modified"].find(k => !taken.has(k));
+        if (!next) return;
+        sortCriteriaOrder.push(next);
+        if (!sortDirs[next]) sortDirs[next] = "desc";
+        listSort = "criteria";
         writeState();
-        renderSortPanel();
-        attachSortCriteriaDrag();
+        syncSortPanel();
+        render();
+        return;
+      }
+
+      // Delete sort — clear all criteria
+      if (e.target.closest("[data-sort-delete-all]")) {
+        sortCriteriaOrder = [];
+        listSort = "manual";
+        writeState();
+        syncSortPanel();
+        render();
+        return;
+      }
+
+      // Apply — force re-render and close the panel
+      if (e.target.closest("[data-sort-apply]")) {
+        writeState();
+        render();
         closeSortPanel();
+        return;
+      }
+    });
+
+    el.sortPanel.addEventListener("change", e => {
+      e.stopPropagation();
+
+      // Field dropdown changed — swap the criterion key at that index
+      const fieldSel = e.target.closest("[data-sort-field-idx]");
+      if (fieldSel) {
+        const idx    = parseInt(fieldSel.dataset.sortFieldIdx, 10);
+        const newKey = fieldSel.value;
+        const oldKey = sortCriteriaOrder[idx];
+        if (newKey === oldKey) return;
+        // Guard: prevent duplicates
+        if (sortCriteriaOrder.includes(newKey)) return;
+        sortCriteriaOrder[idx] = newKey;
+        if (!sortDirs[newKey]) sortDirs[newKey] = "desc";
+        listSort = "criteria";
+        writeState();
+        syncSortPanel();
         render();
         return;
       }
-      // Direction expand/collapse toggle (the right-side button on a criteria row)
-      const expandBtn = e.target.closest("[data-sort-expand]");
-      if (expandBtn) {
-        const key = expandBtn.dataset.sortExpand;
-        sortExpandedKey = sortExpandedKey === key ? null : key;
-        if (listSort !== "criteria") { listSort = "criteria"; }
-        writeState();
-        renderSortPanel();
-        attachSortCriteriaDrag();
-        return;
-      }
-      // Direction option (sub-row)
-      const dirBtn = e.target.closest("[data-sort-dir]");
-      if (dirBtn && dirBtn.dataset.sortFor) {
-        sortDirs[dirBtn.dataset.sortFor] = dirBtn.dataset.sortDir;
-        sortExpandedKey = null;
+
+      // Direction dropdown changed
+      const dirSel = e.target.closest("[data-sort-dir-key]");
+      if (dirSel) {
+        const key = dirSel.dataset.sortDirKey;
+        sortDirs[key] = dirSel.value;
         listSort = "criteria";
         writeState();
-        renderSortPanel();
-        attachSortCriteriaDrag();
-        render();
-        return;
-      }
-      // Criteria row body click → activate criteria mode (keep panel open)
-      const criteriaRow = e.target.closest("[data-sort-key]");
-      if (criteriaRow && !e.target.closest("[data-sort-drag]")) {
-        listSort = "criteria";
-        sortExpandedKey = null;
-        writeState();
-        renderSortPanel();
-        attachSortCriteriaDrag();
         render();
         return;
       }
@@ -1884,56 +1970,69 @@
   }
 
   function renderSortPanel() {
+    const ALL_SORT_FIELDS = ["urgency", "effort", "value", "modified"];
     const SORT_LABELS = {
       urgency:  propLabels.urgency  || "Urgency",
+      effort:   propLabels.effort   || "Effort",
       value:    propLabels.value    || "Dollar Value",
       modified: propLabels.modified || "Modified"
     };
     const DIR_LABELS = {
       urgency:  { desc: "High \u2192 Low", asc: "Low \u2192 High" },
+      effort:   { desc: "High \u2192 Low", asc: "Low \u2192 High" },
       value:    { desc: "High \u2192 Low", asc: "Low \u2192 High" },
       modified: { desc: "Newest first",   asc: "Oldest first"    }
     };
-    const chevronSvg = `<svg class="sort-dir-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
-    const dragSvg    = `<svg class="sort-drag-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>`;
+    const dragSvg = `<svg class="sort-drag-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>`;
+
+    // Build field <select> options — excludes fields already active in other rows
+    function fieldOptions(currentKey) {
+      const taken = new Set(sortCriteriaOrder);
+      return ALL_SORT_FIELDS.map(k => {
+        if (k !== currentKey && taken.has(k)) return "";
+        return `<option value="${k}"${k === currentKey ? " selected" : ""}>${SORT_LABELS[k]}</option>`;
+      }).join("");
+    }
 
     let html = `<div class="sort-panel-header">
-      <span class="sort-panel-title">Sort by</span>
-      <button class="sort-reset-btn" data-sort-reset title="Reset to manual order"${listSort === "manual" ? " disabled" : ""}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        Reset
-      </button>
+      <span class="sort-panel-title">Sort</span>
     </div>`;
 
     html += `<div class="sort-criteria-list" id="sortCriteriaList">`;
-    sortCriteriaOrder.forEach((key, idx) => {
-      const expanded = sortExpandedKey === key;
-      const dir      = sortDirs[key] || "desc";
-      const dirLabel = DIR_LABELS[key][dir];
-      const criteriaActive = listSort === "criteria";
-      html += `<div class="sort-criteria-row${criteriaActive ? " is-mode-active" : ""}" draggable="true" data-sort-key="${key}" data-sort-idx="${idx}">
-        <span class="sort-drag-handle" data-sort-drag="${key}">${dragSvg}</span>
-        <span class="sort-criteria-label">${SORT_LABELS[key]}</span>
-        <button class="sort-dir-toggle${expanded ? " is-expanded" : ""}" data-sort-expand="${key}" title="Change direction">
-          <span class="sort-dir-cur-label">${dirLabel}</span>
-          ${chevronSvg}
-        </button>
-      </div>`;
-      if (expanded) {
-        html += `<div class="sort-dir-options" data-sort-options-for="${key}">
-          <button class="sort-dir-option${dir === "desc" ? " is-active" : ""}" data-sort-dir="desc" data-sort-for="${key}">${DIR_LABELS[key].desc}</button>
-          <button class="sort-dir-option${dir === "asc"  ? " is-active" : ""}" data-sort-dir="asc"  data-sort-for="${key}">${DIR_LABELS[key].asc}</button>
+    if (sortCriteriaOrder.length === 0) {
+      html += `<div class="sort-empty-state">No sort criteria. Use \u201c+ Add sort\u201d to add one.</div>`;
+    } else {
+      sortCriteriaOrder.forEach((key, idx) => {
+        const dir = sortDirs[key] || "desc";
+        html += `<div class="sort-criteria-row" draggable="true" data-sort-key="${key}" data-sort-idx="${idx}">
+          <span class="sort-drag-handle" data-sort-drag="${key}">${dragSvg}</span>
+          <select class="sort-field-select" data-sort-field-idx="${idx}" aria-label="Sort field">
+            ${fieldOptions(key)}
+          </select>
+          <select class="sort-dir-select" data-sort-dir-key="${key}" aria-label="Sort direction">
+            <option value="desc"${dir === "desc" ? " selected" : ""}>${DIR_LABELS[key].desc}</option>
+            <option value="asc"${dir === "asc"  ? " selected" : ""}>${DIR_LABELS[key].asc}</option>
+          </select>
+          <button class="sort-remove-btn" data-sort-remove="${idx}" aria-label="Remove sort criterion" title="Remove">\u00d7</button>
         </div>`;
-      }
-    });
+      });
+    }
     html += `</div>`;
 
-    html += `<div class="sort-panel-sep"></div>`;
-    html += `<button class="dropdown-item sort-manual-item${listSort === "manual" ? " is-active" : ""}" data-sort-manual role="menuitemradio" aria-checked="${listSort === "manual"}">Manual order</button>`;
+    const canAddMore = sortCriteriaOrder.length < ALL_SORT_FIELDS.length;
+    html += `<div class="sort-panel-footer">`;
+    if (canAddMore) {
+      html += `<button class="sort-add-btn" data-sort-add>+ Add sort</button>`;
+    }
+    if (sortCriteriaOrder.length > 0) {
+      html += `<button class="sort-delete-all-btn" data-sort-delete-all>Delete sort</button>`;
+    }
+    html += `</div>`;
+    html += `<div class="sort-panel-apply-row"><button class="sort-apply-btn" data-sort-apply>Apply</button></div>`;
 
     el.sortPanel.innerHTML = html;
 
-    // Dot on the sort toggle when not in manual mode
+    // Dot on the sort toggle when criteria are active
     el.sortToggle.classList.toggle("has-value", listSort !== "manual");
   }
 
@@ -1982,7 +2081,6 @@
       const insertAt = dragOver.above ? toIdx : toIdx + 1;
       sortCriteriaOrder.splice(insertAt, 0, dragKey);
       listSort = "criteria";
-      sortExpandedKey = null;
       writeState();
       renderSortPanel();
       attachSortCriteriaDrag();
@@ -2381,12 +2479,14 @@
       // Snapshot originals for revert
       const origTitle   = task.title;
       const origUrgency = task.urgency;
+      const origEffort  = task.effort;
       const origValue   = task.value;
       const origArea    = task.area;
 
       // Live values — updated field-by-field as user edits
       let draftTitle   = origTitle;
       let draftUrgency = origUrgency;
+      let draftEffort  = origEffort;
       let draftValue   = origValue;
       let draftArea    = origArea;
 
@@ -2444,6 +2544,45 @@
               ke.preventDefault();
               ke.stopPropagation();
               bumpUrgency(ke);
+            }
+          });
+
+          return slot;
+        }
+
+        if (key === "effort" && listVisibleProps.effort) {
+          const slot = document.createElement("div");
+          slot.className = "list-row-field-slot";
+          slot.dataset.field = "effort";
+          slot.tabIndex = 0;
+
+          const chipWrap = document.createElement("span");
+          chipWrap.className = "list-prop-effort-wrap";
+          const chipLabel = document.createElement("span");
+          chipLabel.className = "list-prop-effort-label";
+          chipLabel.textContent = "Effort";
+          const chipNum = document.createElement("span");
+          chipNum.className = "list-prop-effort-num";
+          chipNum.textContent = String(draftEffort);
+          chipNum.title = "Click to cycle (1–10)";
+          chipWrap.appendChild(chipLabel);
+          chipWrap.appendChild(chipNum);
+          slot.appendChild(chipWrap);
+
+          function bumpEffort(e) {
+            e.stopPropagation();
+            draftEffort = draftEffort >= 10 ? 1 : draftEffort + 1;
+            chipNum.textContent = String(draftEffort);
+            chipNum.classList.add("u-bump");
+            chipNum.addEventListener("animationend", () => chipNum.classList.remove("u-bump"), { once: true });
+          }
+
+          chipNum.addEventListener("click", bumpEffort);
+          slot.addEventListener("keydown", ke => {
+            if (ke.key === "ArrowUp" || ke.key === "ArrowDown") {
+              ke.preventDefault();
+              ke.stopPropagation();
+              bumpEffort(ke);
             }
           });
 
@@ -2621,11 +2760,11 @@
 
       function commit() {
         const newTitle   = draftTitle.trim();
-        const changed = newTitle && (newTitle !== origTitle || draftUrgency !== origUrgency || draftValue !== origValue || draftArea !== origArea);
+        const changed = newTitle && (newTitle !== origTitle || draftUrgency !== origUrgency || draftEffort !== origEffort || draftValue !== origValue || draftArea !== origArea);
         cleanup(false);
         if (changed) {
           tasks = tasks.map(t => t.id === task.id
-            ? { ...t, title: newTitle || origTitle, urgency: draftUrgency, value: draftValue, area: draftArea, lastModified: today() }
+            ? { ...t, title: newTitle || origTitle, urgency: draftUrgency, effort: draftEffort, value: draftValue, area: draftArea, lastModified: today() }
             : t);
           task = getTask(task.id) || task;
           writeState();
@@ -2776,6 +2915,45 @@
         return wrap;
       }
 
+      // ── Effort: click-to-cycle badge (1–10) ───────────────────────────────────
+      if (k === "effort" && listVisibleProps.effort) {
+        const wrap = document.createElement("span");
+        wrap.className = "list-prop-effort-wrap list-prop-inline";
+
+        const label = document.createElement("span");
+        label.className = "list-prop-effort-label";
+        label.textContent = "Effort";
+
+        const num = document.createElement("span");
+        num.className = `list-prop-effort-num e-num-${task.effort}`;
+        num.textContent = String(task.effort);
+        num.title = "Click to cycle effort (1–10)";
+        num.tabIndex = 0;
+
+        function cycleEffort(e) {
+          e.stopPropagation();
+          const next = task.effort >= 10 ? 1 : task.effort + 1;
+          tasks = tasks.map(t => t.id === task.id
+            ? { ...t, effort: next, lastModified: today() }
+            : t);
+          task = getTask(task.id) || task;
+          writeState();
+          num.className = `list-prop-effort-num e-num-${next}`;
+          num.textContent = String(next);
+          num.classList.add("u-bump");
+          num.addEventListener("animationend", () => num.classList.remove("u-bump"), { once: true });
+        }
+
+        num.addEventListener("click", cycleEffort);
+        num.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleEffort(e); }
+        });
+
+        wrap.appendChild(label);
+        wrap.appendChild(num);
+        return wrap;
+      }
+
       // ── Value: pill chip (click to enter edit mode on value field) ────────────
       if (k === "value" && listVisibleProps.value && task.value) {
         const c = document.createElement("span");
@@ -2829,28 +3007,46 @@
       return null;
     }
 
-    // Each prop chip gets its own row — above title if before "name", below if after
+    // Each prop chip gets its own row — above title if before "name", below if after.
+    // Exception: urgency + effort are grouped into a single row to save vertical space.
     const nameIdx = listPropOrder.indexOf("name");
     const aboveKeys = listPropOrder.slice(0, nameIdx);
     const belowKeys = listPropOrder.slice(nameIdx + 1);
 
-    aboveKeys.forEach(k => {
-      const chip = buildPropChip(k);
-      if (!chip) return;
-      const propRow = document.createElement("div");
-      propRow.className = "list-prop-row list-prop-row--above";
-      propRow.appendChild(chip);
-      content.appendChild(propRow);
-    });
+    function renderPropKeys(keys, extraClass) {
+      // Collect chips, grouping urgency+effort into one row when both are adjacent
+      const pending = []; // [{chip, key}]
+      for (const k of keys) {
+        const chip = buildPropChip(k);
+        if (chip) pending.push({ key: k, chip });
+      }
+      let i = 0;
+      while (i < pending.length) {
+        const cur = pending[i];
+        const nxt = pending[i + 1];
+        // Group urgency and effort into one row (in either order)
+        const isUE = (a, b) => (
+          (a.key === "urgency" && b && b.key === "effort") ||
+          (a.key === "effort"  && b && b.key === "urgency")
+        );
+        const propRow = document.createElement("div");
+        propRow.className = "list-prop-row" + (extraClass ? " " + extraClass : "");
+        if (isUE(cur, nxt)) {
+          propRow.classList.add("list-prop-row--paired");
+          propRow.appendChild(cur.chip);
+          propRow.appendChild(nxt.chip);
+          i += 2;
+        } else {
+          propRow.appendChild(cur.chip);
+          i += 1;
+        }
+        content.appendChild(propRow);
+      }
+    }
+
+    renderPropKeys(aboveKeys, "list-prop-row--above");
     content.appendChild(title);
-    belowKeys.forEach(k => {
-      const chip = buildPropChip(k);
-      if (!chip) return;
-      const propRow = document.createElement("div");
-      propRow.className = "list-prop-row";
-      propRow.appendChild(chip);
-      content.appendChild(propRow);
-    });
+    renderPropKeys(belowKeys, "");
 
     // Hover tools — single group on the right: delete | edit | done
     const tools = document.createElement("div");
@@ -2889,7 +3085,7 @@
     row.addEventListener("click", e => {
       if (selectedTaskIds.size > 0) { toggleTaskSelection(task.id); return; }
       if (row.classList.contains("is-row-editing")) return;
-      if (e.target.closest(".list-prop-inline, .list-prop-tags-add")) return;
+      if (e.target.closest(".list-prop-inline, .list-prop-tags-add, .tag-list-info-btn")) return;
       if (row.classList.contains("title-near")) {
         row._activateEditMode("name");
         return;
@@ -3182,6 +3378,14 @@
       dot.className = `list-urgency u-${task.urgency}`;
       dot.title = `Urgency ${task.urgency} / 5`;
       topLeft.appendChild(dot);
+    }
+
+    if (cardVisibleProps.effort && task.effort) {
+      const chip = document.createElement("span");
+      chip.className = "card-prop-chip";
+      chip.textContent = `E${task.effort}`;
+      chip.title = `Effort ${task.effort} / 10`;
+      topLeft.appendChild(chip);
     }
 
     if (cardVisibleProps.value && task.value) {
@@ -3550,6 +3754,54 @@
       el.detailProps.appendChild(row);
     });
 
+    // ── Custom properties (per-task) ──────────────────────────────────────────
+    const customProps = t.customProps || {};
+    Object.keys(customProps).sort().forEach(propKey => {
+      const cp = customProps[propKey];
+      if (!cp || !cp.label || !cp.type) return;
+
+      const cpRow = document.createElement("div");
+      cpRow.className = "detail-prop-row detail-prop-row--custom";
+      cpRow.dataset.propKey = propKey;
+
+      // Empty handle placeholder to keep grid alignment
+      const handlePlaceholder = document.createElement("span");
+      handlePlaceholder.className = "prop-drag-handle";
+
+      const cpLabel = document.createElement("div");
+      cpLabel.className = "detail-prop-label";
+      cpLabel.textContent = cp.label;
+      cpLabel.title = "Click to rename";
+      cpLabel.addEventListener("click", () => startCustomPropLabelEdit(cpLabel, t.id, propKey));
+
+      const cpValue = document.createElement("div");
+      cpValue.className = "detail-prop-value";
+      buildCustomPropValue(cpValue, propKey, t);
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "custom-prop-delete-btn";
+      delBtn.type = "button";
+      delBtn.title = "Delete property";
+      delBtn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>`;
+      delBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        deleteCustomProp(t.id, propKey);
+      });
+
+      cpRow.appendChild(handlePlaceholder);
+      cpRow.appendChild(cpLabel);
+      cpRow.appendChild(cpValue);
+      cpRow.appendChild(delBtn);
+      el.detailProps.appendChild(cpRow);
+    });
+
+    // "Add property" row
+    const addPropRow = document.createElement("div");
+    addPropRow.className = "detail-prop-action-row detail-prop-action-row--add";
+    addPropRow.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add property`;
+    addPropRow.addEventListener("click", () => openAddPropForm(addPropRow, t.id));
+    el.detailProps.appendChild(addPropRow);
+
     // Action rows: Mark done / Delete
     const doneRow = document.createElement("div");
     doneRow.className = "detail-prop-action-row detail-prop-action-row--done";
@@ -3591,6 +3843,151 @@
     });
   }
 
+  function startCustomPropLabelEdit(labelEl, taskId, propKey) {
+    const t  = getTask(taskId);
+    const cp = t && (t.customProps || {})[propKey];
+    if (!cp) return;
+
+    const input = document.createElement("input");
+    input.className = "prop-label-input";
+    input.value = cp.label;
+    input.style.cssText = "width:100%;background:transparent;border:none;outline:none;font:inherit;font-weight:600;color:var(--muted-soft);padding:0;";
+    labelEl.textContent = "";
+    labelEl.appendChild(input);
+    input.focus();
+    input.select();
+
+    const save = () => {
+      const v = input.value.trim();
+      const currentCp = (getTask(taskId).customProps || {})[propKey];
+      const displayLabel = (v || (currentCp && currentCp.label)) || propKey;
+      if (v) {
+        tasks = tasks.map(x => {
+          if (x.id !== taskId) return x;
+          const props = Object.assign({}, x.customProps || {});
+          if (props[propKey]) props[propKey] = Object.assign({}, props[propKey], { label: v });
+          return Object.assign({}, x, { customProps: props });
+        });
+        writeState();
+      }
+      labelEl.textContent = displayLabel;
+    };
+    input.addEventListener("blur", save);
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+      if (e.key === "Escape") {
+        labelEl.textContent = cp.label;
+        input.removeEventListener("blur", save);
+        if (input.parentNode) input.parentNode.removeChild(input);
+      }
+    });
+  }
+
+  function openAddPropForm(anchorEl, taskId) {
+    // Prevent double-open
+    if (document.querySelector(".add-prop-panel")) return;
+
+    // Build floating panel
+    const panel = document.createElement("div");
+    panel.className = "add-prop-panel";
+
+    // Name input section
+    const nameWrap = document.createElement("div");
+    nameWrap.className = "add-prop-name-wrap";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "add-prop-name-input";
+    nameInput.placeholder = "Property name…";
+    nameInput.autocomplete = "off";
+    nameWrap.appendChild(nameInput);
+    panel.appendChild(nameWrap);
+
+    // Type section label
+    const typeLabel = document.createElement("div");
+    typeLabel.className = "add-prop-type-label";
+    typeLabel.textContent = "Type";
+    panel.appendChild(typeLabel);
+
+    // Position panel below anchorEl — appended to body to escape overflow:hidden containers
+    document.body.appendChild(panel);
+    const rect = anchorEl.getBoundingClientRect();
+    panel.style.position = "fixed";
+    panel.style.left = rect.left + "px";
+    panel.style.top  = (rect.bottom + 4) + "px";
+
+    let onKey, outside;
+    const dismiss = () => {
+      if (panel.isConnected) panel.remove();
+      document.removeEventListener("mousedown", outside, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+    onKey = e => {
+      if (e.key === "Escape") { e.stopPropagation(); dismiss(); }
+    };
+    outside = e => {
+      if (!panel.isConnected) { document.removeEventListener("mousedown", outside, true); return; }
+      if (!panel.contains(e.target) && !anchorEl.contains(e.target)) { dismiss(); }
+    };
+
+    // Reposition if it would go off the bottom of the viewport
+    requestAnimationFrame(() => {
+      const pRect = panel.getBoundingClientRect();
+      if (pRect.bottom > window.innerHeight - 8) {
+        panel.style.top = (rect.top - pRect.height - 4) + "px";
+      }
+    });
+    nameInput.focus();
+
+    // Type options — clicking immediately creates the prop
+    const TYPES = [
+      { type: "number",   icon: "#",  name: "Number" },
+      { type: "checkbox", icon: "✓",  name: "Checkbox" },
+    ];
+
+    TYPES.forEach(({ type, icon, name }) => {
+      const opt = document.createElement("div");
+      opt.className = "add-prop-type-option";
+      opt.setAttribute("role", "button");
+      opt.tabIndex = 0;
+
+      const iconEl = document.createElement("span");
+      iconEl.className = "add-prop-type-icon";
+      iconEl.textContent = icon;
+
+      const nameEl = document.createElement("span");
+      nameEl.className = "add-prop-type-name";
+      nameEl.textContent = name;
+
+      opt.appendChild(iconEl);
+      opt.appendChild(nameEl);
+
+      const commit = () => {
+        const label = nameInput.value.trim() || name;
+        dismiss();
+        addCustomProp(taskId, label, type);
+      };
+
+      opt.addEventListener("click", commit);
+      opt.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); commit(); } });
+      panel.appendChild(opt);
+    });
+
+    // Enter on name input = add as Number (default)
+    nameInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const label = nameInput.value.trim() || "Number";
+        dismiss();
+        addCustomProp(taskId, label, "number");
+      }
+    });
+
+    setTimeout(() => {
+      document.addEventListener("mousedown", outside, true);
+      document.addEventListener("keydown", onKey, true);
+    }, 0);
+  }
+
   function buildPropValue(container, propKey, t) {
     const colDef   = boardColumns.find(c => c.lanes.includes(t.lane));
     const colLabel = colDef ? colDef.label : (LANE_LABELS[t.lane] || t.lane);
@@ -3615,30 +4012,53 @@
         break;
       }
       case "urgency": {
-        const sel = document.createElement("select");
-        sel.className = "detail-prop-select";
-        // 0 = none (hidden in list/board), 1–5 = active levels
-        const urgencyOptions = [
-          [0, "0 — None"],
-          [1, "1 — Low"],
-          [2, "2"],
-          [3, "3 — Medium"],
-          [4, "4 — High"],
-          [5, "5 — Critical"],
-        ];
-        urgencyOptions.forEach(([u, label]) => {
-          const opt = document.createElement("option");
-          opt.value = String(u);
-          opt.textContent = label;
-          if (u === t.urgency) opt.selected = true;
-          sel.appendChild(opt);
-        });
-        sel.addEventListener("change", () => {
-          const newUrgency = Number(sel.value);
-          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { urgency: newUrgency, priority: urgencyToPriority(newUrgency), lastModified: today() }) : x);
-          writeState(); render();
-        });
-        container.appendChild(sel);
+        let detailUrgency = t.urgency;
+        const wrap = document.createElement("div");
+        wrap.className = "list-prop-urgency-wrap detail-prop-badge-wrap";
+        const num = document.createElement("span");
+        num.className = `list-prop-urgency-num u-num-${detailUrgency}`;
+        num.textContent = detailUrgency === 0 ? "–" : String(detailUrgency);
+        num.title = "Click to cycle urgency (1–5, 0 = none)";
+        num.tabIndex = 0;
+        function cycleDetailUrgency(e) {
+          e.stopPropagation();
+          detailUrgency = detailUrgency >= 5 ? 0 : detailUrgency + 1;
+          num.textContent = detailUrgency === 0 ? "–" : String(detailUrgency);
+          num.className = `list-prop-urgency-num u-num-${detailUrgency}`;
+          num.classList.add("u-bump");
+          num.addEventListener("animationend", () => num.classList.remove("u-bump"), { once: true });
+          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { urgency: detailUrgency, priority: urgencyToPriority(detailUrgency), lastModified: today() }) : x);
+          writeState();
+        }
+        num.addEventListener("click", cycleDetailUrgency);
+        num.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleDetailUrgency(e); } });
+        wrap.appendChild(num);
+        container.appendChild(wrap);
+        break;
+      }
+      case "effort": {
+        let detailEffort = t.effort;
+        const wrap = document.createElement("div");
+        wrap.className = "list-prop-effort-wrap detail-prop-badge-wrap";
+        const num = document.createElement("span");
+        num.className = `list-prop-effort-num e-num-${detailEffort}`;
+        num.textContent = String(detailEffort);
+        num.title = "Click to cycle effort (1–10)";
+        num.tabIndex = 0;
+        function cycleDetailEffort(e) {
+          e.stopPropagation();
+          detailEffort = detailEffort >= 10 ? 1 : detailEffort + 1;
+          num.className = `list-prop-effort-num e-num-${detailEffort}`;
+          num.textContent = String(detailEffort);
+          num.classList.add("u-bump");
+          num.addEventListener("animationend", () => num.classList.remove("u-bump"), { once: true });
+          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { effort: detailEffort, lastModified: today() }) : x);
+          writeState();
+        }
+        num.addEventListener("click", cycleDetailEffort);
+        num.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleDetailEffort(e); } });
+        wrap.appendChild(num);
+        container.appendChild(wrap);
         break;
       }
       case "value": {
@@ -3680,9 +4100,40 @@
       }
       case "modified":
       default: {
-        container.textContent = (propKey === "modified" ? t.lastModified : "—") || "—";
+        container.textContent = (propKey === "modified" ? formatDisplayDate(t.lastModified) : "—") || "—";
         break;
       }
+    }
+  }
+
+  function buildCustomPropValue(container, propKey, t) {
+    const cp = (t.customProps || {})[propKey];
+    if (!cp) { container.textContent = "—"; return; }
+
+    if (cp.type === "number") {
+      const inp = document.createElement("input");
+      inp.type = "number";
+      inp.value = (cp.value === 0 || cp.value) ? cp.value : "";
+      inp.placeholder = "—";
+      inp.style.cssText = "background:transparent;border:none;outline:none;font:inherit;font-size:0.82rem;color:var(--text);padding:0;width:100%;";
+      inp.addEventListener("change", () => {
+        updateCustomPropValue(t.id, propKey, Number(inp.value) || 0);
+      });
+      container.appendChild(inp);
+    } else if (cp.type === "checkbox") {
+      const wrapper = document.createElement("label");
+      wrapper.className = "custom-prop-checkbox-wrap";
+      const track = document.createElement("span");
+      track.className = "toggle-track custom-prop-toggle" + (cp.value ? " is-on" : "");
+      track.setAttribute("role", "switch");
+      track.setAttribute("aria-checked", String(!!cp.value));
+      track.tabIndex = 0;
+      track.innerHTML = '<span class="toggle-thumb"></span>';
+      bindToggleSwitch(track, v => {
+        updateCustomPropValue(t.id, propKey, v);
+      });
+      wrapper.appendChild(track);
+      container.appendChild(wrapper);
     }
   }
 
@@ -3757,6 +4208,7 @@
       pop.appendChild(h);
       [
         ["urgency", propLabels.urgency || "Urgency", () => cardVisibleProps.urgency, v => { cardVisibleProps.urgency = v; }],
+        ["effort",  propLabels.effort  || "Effort",  () => cardVisibleProps.effort,  v => { cardVisibleProps.effort  = v; }],
         ["notes",   "Notes preview",                () => cardVisibleProps.notes,   v => { cardVisibleProps.notes   = v; }],
         ["value",   propLabels.value   || "Dollar Value",  () => cardVisibleProps.value,   v => { cardVisibleProps.value   = v; }],
         ["area",    propLabels.area    || "Area",   () => cardVisibleProps.area,    v => { cardVisibleProps.area    = v; }],
@@ -4149,6 +4601,7 @@
 
     // Only show inputs for properties enabled in settings
     let urgencySelect = null;
+    let effortSelect  = null;
     let valueInput    = null;
     let areaSelect    = null;
 
@@ -4168,6 +4621,18 @@
           dot.title = `Urgency ${urgencySelect.value}`;
         });
         return urgencySelect;
+      }
+      if (key === "effort" && listVisibleProps.effort) {
+        effortSelect = document.createElement("select");
+        effortSelect.className = "board-inline-new-select";
+        for (let i = 1; i <= 10; i++) {
+          const opt = document.createElement("option");
+          opt.value = String(i);
+          opt.textContent = i === 1 ? "1 — Trivial" : i === 5 ? "5 — Medium" : i === 10 ? "10 — Very hard" : String(i);
+          if (i === 5) opt.selected = true;
+          effortSelect.appendChild(opt);
+        }
+        return effortSelect;
       }
       if (key === "value" && listVisibleProps.value) {
         valueInput = document.createElement("input");
@@ -4270,6 +4735,7 @@
       const title = titleInput.innerText.trim();
       if (!title) { titleInput.focus(); return; }
       const urgencyVal = urgencySelect ? clamp(Number(urgencySelect.value) || 3, 1, 5) : 3;
+      const effortVal  = effortSelect  ? clamp(Number(effortSelect.value)  || 5, 1, 10) : 5;
       const newTask = {
         id:            createId(),
         title,
@@ -4277,6 +4743,7 @@
         body:          "",
         lane:          "newly-added-or-updated",
         urgency:       urgencyVal,
+        effort:        effortVal,
         value:         valueInput ? (Number(valueInput.value) || 0) : 0,
         priority:      urgencyToPriority(urgencyVal),
         area:          areaSelect ? areaSelect.value : (tracker.areas[0] || "general"),
@@ -4295,6 +4762,7 @@
         titleInput.textContent = "";
         if (valueInput)    valueInput.value    = "";
         if (urgencySelect) urgencySelect.value = "3";
+        if (effortSelect)  effortSelect.value  = "5";
         if (areaSelect)    areaSelect.value    = tracker.areas[0] || "general";
         render();
         el.taskList.insertBefore(form, el.taskList.firstChild);
@@ -4355,6 +4823,7 @@
       el.taskTitle.value   = task.title;
       el.taskLane.value    = task.lane;
       el.taskUrgency.value = String(task.urgency);
+      if (el.taskEffort) el.taskEffort.value = String(task.effort || 5);
       el.taskValue.value   = String(task.value);
       el.taskArea.value    = task.area;
       el.taskSource.value  = task.source;
@@ -4364,6 +4833,7 @@
       el.taskForm.reset();
       el.taskLane.value    = defaultLane || "newly-added-or-updated";
       el.taskUrgency.value = "3";
+      if (el.taskEffort) el.taskEffort.value = "5";
       el.taskArea.value    = "project-system";
       el.taskSource.value  = "user-requested";
       if (el.taskTagsInput) renderModalTagPills([]);
@@ -4478,6 +4948,15 @@
 
     tags.forEach(tag => {
       const pill = buildTagPill(tag, true);
+      pill.classList.add("tag-pill--detail");
+
+      // "•••" hint — visible on hover via CSS
+      const hint = document.createElement("span");
+      hint.className = "tag-pill-edit-hint";
+      hint.setAttribute("aria-hidden", "true");
+      hint.textContent = "•••";
+      pill.appendChild(hint);
+
       const x = document.createElement("span");
       x.className = "tag-pill-remove";
       x.innerHTML = "×";
@@ -4490,6 +4969,15 @@
         if (detailTaskId === t.id) refreshDetailProps(getTask(t.id));
       });
       pill.appendChild(x);
+
+      // Clicking the pill body (not × or hint) opens the tag edit flyout
+      pill.addEventListener("click", e => {
+        if (e.target === x || x.contains(e.target)) return;
+        if (e.target === hint) return;
+        e.stopPropagation();
+        openTagEditFlyout(tag, pill, t);
+      });
+
       pillsRow.appendChild(pill);
     });
 
@@ -4542,6 +5030,21 @@
         const pill = buildTagPill(tag, false);
         item.appendChild(check);
         item.appendChild(pill);
+
+        // ⋯ button — visible on row hover, opens the tag edit flyout
+        const infoBtn = document.createElement("button");
+        infoBtn.type = "button";
+        infoBtn.className = "tag-list-info-btn";
+        infoBtn.setAttribute("aria-label", `Edit "${tag}" tag`);
+        infoBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
+        infoBtn.addEventListener("mousedown", e => {
+          e.preventDefault();
+          e.stopPropagation();
+          openTagEditFlyout(tag, infoBtn, t);
+        });
+        infoBtn.addEventListener("click", e => { e.stopPropagation(); });
+        item.appendChild(infoBtn);
+
         item.addEventListener("mousedown", e => {
           e.preventDefault();
           const freshTask = getTask(t.id) || t;
@@ -4566,7 +5069,31 @@
         const cur2 = Array.isArray(t.tags) ? t.tags : [];
         const create = document.createElement("div");
         create.className = "detail-tag-list-item detail-tag-create";
-        create.innerHTML = `<span class="detail-tag-check"></span><span class="detail-tag-create-label">Create <strong>${q}</strong></span>`;
+        const emptyCheck = document.createElement("span");
+        emptyCheck.className = "detail-tag-check";
+        create.appendChild(emptyCheck);
+        const createLabel = document.createElement("span");
+        createLabel.className = "detail-tag-create-label";
+        createLabel.innerHTML = `Create <strong>${q}</strong>`;
+        create.appendChild(createLabel);
+        // ⋯ on the create row — opens flyout after tag is created
+        const createInfoBtn = document.createElement("button");
+        createInfoBtn.type = "button";
+        createInfoBtn.className = "tag-list-info-btn";
+        createInfoBtn.setAttribute("aria-label", `Create and edit "${q}" tag`);
+        createInfoBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
+        createInfoBtn.addEventListener("mousedown", e => {
+          e.preventDefault();
+          e.stopPropagation();
+          getTagColor(q);
+          const newTags = [...cur2, q];
+          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { tags: newTags, lastModified: today() }) : x);
+          writeState(); render();
+          openTagEditFlyout(q, createInfoBtn, getTask(t.id) || t);
+          dd.remove();
+        });
+        createInfoBtn.addEventListener("click", e => { e.stopPropagation(); });
+        create.appendChild(createInfoBtn);
         create.addEventListener("mousedown", e => {
           e.preventDefault();
           getTagColor(q);
@@ -4587,6 +5114,7 @@
     setTimeout(() => {
       function onOutside(e) {
         if (!dd.contains(e.target) && !anchorEl.contains(e.target)) {
+          document.querySelectorAll(".tag-edit-flyout").forEach(f => f.remove());
           dd.remove();
           document.removeEventListener("mousedown", onOutside, true);
         }
@@ -4596,6 +5124,146 @@
 
     anchorEl.appendChild(dd);
     inp.focus();
+  }
+
+  function openTagEditFlyout(tagName, anchorEl, t) {
+    // Close any existing flyout and dropdowns
+    document.querySelectorAll(".tag-edit-flyout").forEach(f => f.remove());
+
+    let currentTagName = tagName;
+
+    const flyout = document.createElement("div");
+    flyout.className = "tag-edit-flyout";
+
+    // ── Name input ──────────────────────────────────────────────────────────
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "tag-edit-name-input";
+    nameInput.value = tagName;
+    nameInput.spellcheck = false;
+
+    let renaming = false;
+    function confirmRename() {
+      if (renaming) return;
+      const newName = nameInput.value.trim();
+      if (!newName || newName === currentTagName) return;
+      renaming = true;
+      const ok = renameTagGlobally(currentTagName, newName);
+      renaming = false;
+      if (!ok) {
+        nameInput.value = currentTagName;
+        nameInput.classList.add("tag-edit-name-input--error");
+        setTimeout(() => nameInput.classList.remove("tag-edit-name-input--error"), 800);
+        return;
+      }
+      currentTagName = newName;
+      flyout.remove();
+      if (detailTaskId) refreshDetailProps(getTask(detailTaskId));
+    }
+
+    nameInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); confirmRename(); }
+      if (e.key === "Escape") { flyout.remove(); }
+    });
+    nameInput.addEventListener("blur", confirmRename);
+    flyout.appendChild(nameInput);
+
+    // ── Divider ─────────────────────────────────────────────────────────────
+    const div1 = document.createElement("div");
+    div1.className = "tag-edit-flyout-divider";
+    flyout.appendChild(div1);
+
+    // ── Delete button ────────────────────────────────────────────────────────
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "tag-edit-delete-btn";
+    deleteBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> Delete tag`;
+    deleteBtn.addEventListener("mousedown", e => {
+      e.preventDefault();
+      deleteTagGlobally(currentTagName);
+      flyout.remove();
+      document.querySelectorAll(".detail-tag-dropdown").forEach(d => d.remove());
+      if (detailTaskId) refreshDetailProps(getTask(detailTaskId));
+    });
+    flyout.appendChild(deleteBtn);
+
+    // ── Divider ─────────────────────────────────────────────────────────────
+    const div2 = document.createElement("div");
+    div2.className = "tag-edit-flyout-divider";
+    flyout.appendChild(div2);
+
+    // ── Color section label ──────────────────────────────────────────────────
+    const colorLabel = document.createElement("div");
+    colorLabel.className = "tag-edit-flyout-section-label";
+    colorLabel.textContent = "Color";
+    flyout.appendChild(colorLabel);
+
+    // ── Color grid ──────────────────────────────────────────────────────────
+    const grid = document.createElement("div");
+    grid.className = "tag-edit-flyout-color-grid";
+
+    TAG_COLORS.forEach((c, idx) => {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className = "tag-color-swatch";
+      swatch.title = TAG_COLOR_LABELS[idx] || String(idx);
+      // Use the text color as solid swatch background so swatches are visually distinct
+      swatch.style.cssText = `background:${c.text}; border-color:${c.border};`;
+      if (tagRegistry[currentTagName] === idx) {
+        swatch.classList.add("tag-color-swatch--active");
+      }
+      swatch.addEventListener("mousedown", e => {
+        e.preventDefault(); // prevent nameInput blur
+        tagRegistry[currentTagName] = idx;
+        writeState();
+        render();
+        if (detailTaskId) refreshDetailProps(getTask(detailTaskId));
+        // Update active state in grid without closing flyout
+        grid.querySelectorAll(".tag-color-swatch").forEach((s, i) => {
+          s.classList.toggle("tag-color-swatch--active", i === idx);
+        });
+      });
+      grid.appendChild(swatch);
+    });
+
+    flyout.appendChild(grid);
+
+    // ── Append to body and position (fixed, prefer right of anchor) ──────────
+    document.body.appendChild(flyout);
+
+    const aRect = anchorEl.getBoundingClientRect();
+    const fW = 230;
+    const spaceRight = window.innerWidth - aRect.right;
+
+    let flyLeft, flyTop;
+    if (spaceRight >= fW + 8) {
+      flyLeft = aRect.right + 6;
+      flyTop  = aRect.top;
+    } else {
+      flyLeft = aRect.left;
+      flyTop  = aRect.bottom + 4;
+    }
+    // Clamp so flyout never overflows the right or bottom edge
+    flyLeft = Math.min(flyLeft, window.innerWidth - fW - 8);
+    flyLeft = Math.max(8, flyLeft);
+    flyTop  = Math.min(flyTop, window.innerHeight - 8 - flyout.offsetHeight);
+    flyTop  = Math.max(8, flyTop);
+    flyout.style.left = flyLeft + "px";
+    flyout.style.top  = flyTop  + "px";
+
+    // ── Outside-click dismissal ──────────────────────────────────────────────
+    setTimeout(() => {
+      function onOutside(e) {
+        if (!flyout.contains(e.target) && e.target !== anchorEl) {
+          flyout.remove();
+          document.removeEventListener("mousedown", onOutside, true);
+        }
+      }
+      document.addEventListener("mousedown", onOutside, true);
+    }, 0);
+
+    nameInput.focus();
+    nameInput.select();
   }
 
   function openDetailTagDropdown(container, t, anchor) {
@@ -4633,6 +5301,21 @@
         const pill = buildTagPill(tag, false);
         item.appendChild(check);
         item.appendChild(pill);
+
+        // ⋯ button — visible on row hover, opens the tag edit flyout
+        const infoBtn = document.createElement("button");
+        infoBtn.type = "button";
+        infoBtn.className = "tag-list-info-btn";
+        infoBtn.setAttribute("aria-label", `Edit "${tag}" tag`);
+        infoBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
+        infoBtn.addEventListener("mousedown", e => {
+          e.preventDefault();
+          e.stopPropagation();
+          openTagEditFlyout(tag, infoBtn, t);
+        });
+        infoBtn.addEventListener("click", e => { e.stopPropagation(); });
+        item.appendChild(infoBtn);
+
         item.addEventListener("mousedown", e => {
           e.preventDefault();
           let newTags;
@@ -4654,7 +5337,32 @@
         const cur2 = Array.isArray(t.tags) ? t.tags : [];
         const create = document.createElement("div");
         create.className = "detail-tag-list-item detail-tag-create";
-        create.innerHTML = `<span class="detail-tag-check"></span><span class="detail-tag-create-label">Create <strong>${q}</strong></span>`;
+        const emptyCheck = document.createElement("span");
+        emptyCheck.className = "detail-tag-check";
+        create.appendChild(emptyCheck);
+        const createLabel = document.createElement("span");
+        createLabel.className = "detail-tag-create-label";
+        createLabel.innerHTML = `Create <strong>${q}</strong>`;
+        create.appendChild(createLabel);
+        // ⋯ on the create row — creates tag and immediately opens flyout for color pick
+        const createInfoBtn = document.createElement("button");
+        createInfoBtn.type = "button";
+        createInfoBtn.className = "tag-list-info-btn";
+        createInfoBtn.setAttribute("aria-label", `Create and edit "${q}" tag`);
+        createInfoBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
+        createInfoBtn.addEventListener("mousedown", e => {
+          e.preventDefault();
+          e.stopPropagation();
+          getTagColor(q);
+          const newTags = [...cur2, q];
+          tasks = tasks.map(x => x.id === t.id ? Object.assign({}, x, { tags: newTags, lastModified: today() }) : x);
+          writeState(); render();
+          if (detailTaskId === t.id) refreshDetailProps(getTask(t.id));
+          openTagEditFlyout(q, createInfoBtn, getTask(t.id) || t);
+          dd.remove();
+        });
+        createInfoBtn.addEventListener("click", e => { e.stopPropagation(); });
+        create.appendChild(createInfoBtn);
         create.addEventListener("mousedown", e => {
           e.preventDefault();
           getTagColor(q);
@@ -4672,10 +5380,11 @@
     inp.addEventListener("input", () => renderList(inp.value));
     inp.addEventListener("keydown", e => { if (e.key === "Escape") dd.remove(); });
 
-    // Close on outside click
+    // Close on outside click — also close any open flyout
     setTimeout(() => {
       function onOutside(e) {
         if (!dd.contains(e.target) && e.target !== anchor) {
+          document.querySelectorAll(".tag-edit-flyout").forEach(f => f.remove());
           dd.remove();
           document.removeEventListener("mousedown", onOutside, true);
         }
@@ -4683,7 +5392,10 @@
       document.addEventListener("mousedown", onOutside, true);
     }, 0);
 
-    container.appendChild(dd);
+    document.body.appendChild(dd);
+    const aRect = anchor.getBoundingClientRect();
+    dd.style.top  = (aRect.bottom + 4) + "px";
+    dd.style.left = aRect.left + "px";
     inp.focus();
   }
 
@@ -4778,6 +5490,7 @@
     if (!title) return;
 
     const urgency  = clamp(Number(el.taskUrgency.value) || 3, 1, 5);
+    const effort   = clamp(Number(el.taskEffort ? el.taskEffort.value : 5) || 5, 1, 10);
     const priority = urgencyToPriority(urgency);
     const lane     = el.taskLane.value;
 
@@ -4796,6 +5509,7 @@
       body:          editingId ? (getTask(editingId)?.body || "") : "",
       lane,
       urgency,
+      effort,
       value:         Number(el.taskValue.value || 0),
       priority,
       area:          el.taskArea.value,
@@ -4956,6 +5670,7 @@
       const desc = (sortDirs[key] || "desc") !== "asc"; // true = High→Low / Newest first
       let aVal, bVal;
       if      (key === "urgency")  { aVal = a.urgency;                   bVal = b.urgency; }
+      else if (key === "effort")   { aVal = a.effort;                    bVal = b.effort; }
       else if (key === "value")    { aVal = a.value;                     bVal = b.value; }
       else if (key === "modified") { aVal = String(a.lastModified || ""); bVal = String(b.lastModified || ""); }
       else continue;
@@ -4981,7 +5696,7 @@
     const dt    = today();
     const lines = ["# LBM Tasks", "", `Exported: ${new Date().toISOString()}`, "", "## Tasks", ""];
     tasks.slice().sort(sortTasks).forEach(t => {
-      lines.push(`- ${t.title} | ${LANE_LABELS[t.lane] || t.lane} | urgency ${t.urgency}`);
+      lines.push(`- ${t.title} | ${LANE_LABELS[t.lane] || t.lane} | urgency ${t.urgency} | effort ${t.effort}`);
       if (t.notes) lines.push(`  Notes: ${t.notes}`);
       lines.push("");
     });
@@ -5063,6 +5778,45 @@
   function today() { return new Date().toISOString().slice(0, 10); }
   function createId() { return "LOCAL-" + Date.now(); }
   function clamp(v, min, max) { const n = Number(v); return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : min; }
+
+  /* ── Custom property utilities ──────────────────────────────────────────────── */
+
+  function createCustomPropKey() { return "cp-" + Date.now(); }
+
+  function addCustomProp(taskId, label, type) {
+    const key = createCustomPropKey();
+    const defaultValue = type === "checkbox" ? false : 0;
+    tasks = tasks.map(t => {
+      if (t.id !== taskId) return t;
+      const props = Object.assign({}, t.customProps || {});
+      props[key] = { label: label.trim(), type, value: defaultValue };
+      return Object.assign({}, t, { customProps: props, lastModified: today() });
+    });
+    writeState();
+    refreshDetailProps(getTask(taskId));
+  }
+
+  function deleteCustomProp(taskId, propKey) {
+    tasks = tasks.map(t => {
+      if (t.id !== taskId) return t;
+      const props = Object.assign({}, t.customProps || {});
+      delete props[propKey];
+      return Object.assign({}, t, { customProps: props, lastModified: today() });
+    });
+    writeState();
+    refreshDetailProps(getTask(taskId));
+  }
+
+  function updateCustomPropValue(taskId, propKey, newValue) {
+    tasks = tasks.map(t => {
+      if (t.id !== taskId) return t;
+      const props = Object.assign({}, t.customProps || {});
+      if (!props[propKey]) return t;
+      props[propKey] = Object.assign({}, props[propKey], { value: newValue });
+      return Object.assign({}, t, { customProps: props, lastModified: today() });
+    });
+    writeState();
+  }
 
   function urgencyToPriority(u) {
     if (u >= 5) return "P0";

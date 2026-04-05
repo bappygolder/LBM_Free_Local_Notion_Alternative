@@ -2251,6 +2251,12 @@ button.danger:hover { background: #f87171; }
 
 .detail-prop-select:focus { outline: none; }
 
+/* Badge wrap inside detail panel — same pill design as list view */
+.detail-prop-badge-wrap {
+  padding-left: 0;
+  gap: 0;
+}
+
 /* Action rows (Mark done / Delete) inside props */
 .detail-prop-action-row {
   display: flex;
@@ -2276,6 +2282,121 @@ button.danger:hover { background: #f87171; }
 .detail-prop-action-row--delete { color: var(--muted); }
 .detail-prop-action-row--delete:hover { color: var(--danger); background: var(--danger-soft) !important; }
 .detail-prop-action-row--delete:hover svg { opacity: 0.8; }
+
+/* ── Custom property rows ──────────────────────────────────────────────────── */
+.detail-prop-row--custom {
+  grid-template-columns: 18px 140px 1fr 22px;
+  position: relative;
+}
+.custom-prop-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 100%;
+  background: none;
+  border: none;
+  color: var(--muted-soft);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.12s, color 0.12s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.detail-prop-row--custom:hover .custom-prop-delete-btn { opacity: 0.45; }
+.custom-prop-delete-btn:hover { opacity: 1 !important; color: var(--danger); }
+
+.custom-prop-checkbox-wrap { display: flex; align-items: center; }
+.custom-prop-toggle { width: 26px; height: 15px; }
+.custom-prop-toggle .toggle-thumb { width: 10px; height: 10px; top: 2px; left: 2px; }
+.custom-prop-toggle.is-on .toggle-thumb { left: 13px; }
+
+/* "Add property" trigger row */
+.detail-prop-action-row--add {
+  color: var(--muted-soft);
+  font-size: 0.78rem;
+  position: relative;
+}
+.detail-prop-action-row--add:hover { color: var(--muted); background: transparent !important; }
+.detail-prop-action-row--add svg { opacity: 0.5; }
+.detail-prop-action-row--add:hover svg { opacity: 0.7; }
+
+/* ── Add-property floating panel ──────────────────────────────────────────── */
+.add-prop-panel {
+  z-index: 600;
+  width: 220px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3);
+  overflow: hidden;
+  animation: popIn 0.12s ease;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Name input area */
+.add-prop-name-wrap {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.add-prop-name-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0;
+  caret-color: var(--accent);
+}
+.add-prop-name-input::placeholder { color: var(--muted-soft); }
+
+/* Type section label */
+.add-prop-type-label {
+  padding: 6px 10px 3px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted-soft);
+  user-select: none;
+}
+
+/* Type option rows */
+.add-prop-type-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  user-select: none;
+}
+.add-prop-type-option:last-child { padding-bottom: 8px; }
+.add-prop-type-option:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.add-prop-type-option:hover .add-prop-type-icon { color: var(--accent-hover); }
+
+.add-prop-type-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: color 0.1s;
+}
+.add-prop-type-name { font-size: 0.82rem; }
 
 /* Notes section */
 .detail-section-label {
@@ -3567,17 +3688,16 @@ button.danger:hover { background: #f87171; }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
 }
 
-/* ─── Sort panel — advanced multi-criteria sort ─────────────────────────────── */
+/* ─── Sort panel — Notion-style dynamic criteria list ───────────────────────── */
 
 .sort-panel {
-  min-width: 240px;
+  min-width: 320px;
 }
 
 .sort-panel-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 5px 8px 4px 12px;
+  padding: 5px 12px 4px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   margin-bottom: 3px;
 }
@@ -3590,31 +3710,13 @@ button.danger:hover { background: #f87171; }
   color: var(--muted-soft);
 }
 
-.sort-reset-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px 2px 5px;
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+/* Empty state */
+
+.sort-empty-state {
+  padding: 10px 14px;
+  font-size: 0.78rem;
   color: var(--muted-soft);
-  font-size: 0.7rem;
-  font-family: inherit;
-  cursor: pointer;
-  transition: color 0.1s, border-color 0.1s, background 0.1s;
-  line-height: 1;
-}
-
-.sort-reset-btn:hover:not(:disabled) {
-  color: var(--text);
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.sort-reset-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
+  text-align: center;
 }
 
 /* Criteria list */
@@ -3627,7 +3729,7 @@ button.danger:hover { background: #f87171; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px 5px 6px;
+  padding: 4px 8px 4px 6px;
   cursor: grab;
   transition: background 0.1s;
   user-select: none;
@@ -3669,126 +3771,148 @@ button.danger:hover { background: #f87171; }
   pointer-events: none;
 }
 
-/* Criteria label */
+/* Field and direction selects */
 
-.sort-criteria-label {
+.sort-field-select,
+.sort-dir-select {
   flex: 1;
-  font-size: 0.82rem;
-  font-weight: 450;
-  color: var(--muted);
-  transition: color 0.1s;
-}
-
-.sort-criteria-row.is-mode-active .sort-criteria-label {
-  color: var(--text);
-}
-
-/* Direction toggle button */
-
-.sort-dir-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 5px;
+  min-width: 0;
+  padding: 2px 6px;
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
-  color: var(--muted-soft);
-  font-size: 0.7rem;
+  color: var(--muted);
+  font-size: 0.75rem;
   font-family: inherit;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
-  flex-shrink: 0;
+  transition: border-color 0.1s, color 0.1s, background 0.1s;
+  overflow: hidden;
 }
 
-.sort-dir-toggle:hover {
-  background: rgba(255, 255, 255, 0.09);
+.sort-field-select {
+  max-width: 120px;
+}
+
+.sort-dir-select {
+  max-width: 160px;
+}
+
+.sort-field-select:hover,
+.sort-dir-select:hover {
+  border-color: rgba(255, 255, 255, 0.2);
   color: var(--text);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.sort-dir-toggle.is-expanded {
-  background: var(--accent-soft);
-  border-color: rgba(139, 92, 246, 0.3);
-  color: var(--accent-light);
+.sort-field-select:focus,
+.sort-dir-select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
 }
 
-.sort-dir-cur-label {
-  line-height: 1;
+.sort-field-select option,
+.sort-dir-select option {
+  background: #1a1b28;
+  color: var(--text);
 }
 
-.sort-dir-chevron {
+/* Remove (×) button */
+
+.sort-remove-btn {
   flex-shrink: 0;
-  transition: transform 0.15s;
-}
-
-.sort-dir-toggle.is-expanded .sort-dir-chevron {
-  transform: rotate(180deg);
-}
-
-/* Direction sub-options */
-
-.sort-dir-options {
-  padding: 2px 8px 4px 30px;
-  animation: dropdown-open 0.12s ease both;
-}
-
-.sort-dir-option {
   display: flex;
   align-items: center;
-  width: 100%;
-  padding: 4px 8px 4px 18px;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
   background: none;
   border: none;
   border-radius: 4px;
+  color: var(--muted-soft);
+  font-size: 1rem;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+
+.sort-remove-btn:hover {
+  color: var(--danger, #f87171);
+  background: rgba(248, 113, 113, 0.1);
+}
+
+/* Footer: + Add sort / Delete sort */
+
+.sort-panel-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 3px;
+}
+
+.sort-add-btn {
+  padding: 4px 10px;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
   color: var(--muted);
   font-size: 0.78rem;
   font-family: inherit;
   cursor: pointer;
-  text-align: left;
-  position: relative;
-  transition: background 0.1s, color 0.1s;
+  transition: color 0.1s, border-color 0.1s, background 0.1s;
 }
 
-.sort-dir-option::before {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 10px;
-  height: 10px;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-}
-
-.sort-dir-option:hover {
+.sort-add-btn:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.2);
   background: rgba(255, 255, 255, 0.05);
-  color: var(--text);
 }
 
-.sort-dir-option.is-active {
-  color: var(--text);
-  font-weight: 500;
+.sort-delete-all-btn {
+  padding: 4px 10px;
+  background: none;
+  border: none;
+  color: var(--muted-soft);
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.1s;
+  margin-left: auto;
 }
 
-.sort-dir-option.is-active::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+.sort-delete-all-btn:hover {
+  color: var(--danger, #f87171);
 }
 
-/* Separator + manual order */
-
-.sort-panel-sep {
-  height: 1px;
-  background: rgba(255, 255, 255, 0.06);
-  margin: 3px 0;
+/* Apply row */
+.sort-panel-apply-row {
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
 }
 
-.sort-manual-item {
-  /* Inherits .dropdown-item — just ensure full width */
+.sort-apply-btn {
+  width: 100%;
+  padding: 6px 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, transform 0.08s;
 }
+
+.sort-apply-btn:hover { background: var(--accent-hover); }
+.sort-apply-btn:active { transform: scale(0.97); }
 
 /* Colored icon when filter/sort has a non-default value applied — Notion-style */
 .toolbar-icon-btn.has-value {
@@ -3974,6 +4098,67 @@ button.danger:hover { background: #f87171; }
   margin-top: 0;
   margin-bottom: 3px;
 }
+
+/* Paired urgency + effort on one row — add a faint divider between them */
+.list-prop-row--paired {
+  align-items: center;
+  gap: 2px;
+}
+.list-prop-row--paired > * + * {
+  padding-left: 8px;
+  margin-left: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+/* ── Effort: "Effort" label + clickable number badge (1–10) ─────────────────── */
+
+.list-prop-effort-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-left: 4px;
+}
+
+.list-prop-effort-label {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted-soft);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.list-prop-effort-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+  transition: filter 0.12s, transform 0.1s;
+}
+.list-prop-effort-num:hover { filter: brightness(1.25); transform: scale(1.1); }
+.list-prop-effort-num.u-bump { animation: u-bump 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+/* Effort number badge: 1 (pale yellow) → 10 (deep amber/gold) */
+.list-prop-effort-num.e-num-1  { background: rgba(253, 230, 138, 0.08); border-color: rgba(253, 230, 138, 0.15); color: #fde68a; }
+.list-prop-effort-num.e-num-2  { background: rgba(252, 211,  77, 0.09); border-color: rgba(252, 211,  77, 0.17); color: #fcd34d; }
+.list-prop-effort-num.e-num-3  { background: rgba(251, 191,  36, 0.10); border-color: rgba(251, 191,  36, 0.20); color: #fbbf24; }
+.list-prop-effort-num.e-num-4  { background: rgba(245, 158,  11, 0.12); border-color: rgba(245, 158,  11, 0.22); color: #f59e0b; }
+.list-prop-effort-num.e-num-5  { background: rgba(234, 138,   0, 0.14); border-color: rgba(234, 138,   0, 0.25); color: #ea8a00; }
+.list-prop-effort-num.e-num-6  { background: rgba(217, 119,   6, 0.15); border-color: rgba(217, 119,   6, 0.27); color: #d97706; }
+.list-prop-effort-num.e-num-7  { background: rgba(202,  99,   6, 0.17); border-color: rgba(202,  99,   6, 0.30); color: #ca6306; }
+.list-prop-effort-num.e-num-8  { background: rgba(180,  83,   9, 0.18); border-color: rgba(180,  83,   9, 0.32); color: #b45309; }
+.list-prop-effort-num.e-num-9  { background: rgba(154,  52,   3, 0.20); border-color: rgba(154,  52,   3, 0.34); color: #9a3403; }
+.list-prop-effort-num.e-num-10 { background: rgba(120,  30,   0, 0.22); border-color: rgba(180,  60,   0, 0.38); color: #c2460a; }
 
 /* ── Urgency: "Urgency" label + clickable number badge ──────────────────────── */
 
@@ -4327,9 +4512,7 @@ button.danger:hover { background: #f87171; }
 
 /* Detail tag dropdown */
 .detail-tag-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
+  position: fixed;
   min-width: 200px;
   max-width: 280px;
   background: var(--surface-overlay, #1c1d28);
@@ -4386,6 +4569,163 @@ button.danger:hover { background: #f87171; }
   color: var(--muted);
 }
 .detail-tag-create-label strong { color: var(--text); font-weight: 600; }
+
+/* ─── Detail panel pill — hover affordance ──────────────────────────────────── */
+
+.tag-pill--detail {
+  cursor: pointer;
+  position: relative;
+  transition: filter 80ms ease, box-shadow 80ms ease;
+}
+.tag-pill--detail:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.12);
+}
+
+.tag-pill-edit-hint {
+  display: none;
+  font-size: 0.55rem;
+  letter-spacing: -0.05em;
+  opacity: 0.6;
+  margin-left: 2px;
+  flex-shrink: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+.tag-pill--detail:hover .tag-pill-edit-hint {
+  display: inline;
+}
+
+/* ─── Info button in detail tag dropdown rows ───────────────────────────────── */
+
+.tag-list-info-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+  transition: color 80ms ease, background 80ms ease;
+}
+.tag-list-info-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.detail-tag-list-item:hover .tag-list-info-btn {
+  display: inline-flex;
+}
+
+/* ─── Tag edit flyout (color picker sub-panel) ──────────────────────────────── */
+
+.tag-edit-flyout {
+  position: fixed;
+  z-index: 100000;
+  width: 220px;
+  background: var(--surface-overlay, #1c1d28);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tag-edit-name-input {
+  width: 100%;
+  background: var(--surface-solid, #0f1017);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 5px 8px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 80ms ease;
+}
+.tag-edit-name-input:focus { border-color: var(--accent); }
+.tag-edit-name-input--error {
+  border-color: #ef4444;
+  animation: tag-shake 0.3s ease;
+}
+
+@keyframes tag-shake {
+  0%,100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+
+.tag-edit-flyout-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.tag-edit-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-family: inherit;
+  padding: 5px 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 80ms ease, color 80ms ease;
+}
+.tag-edit-delete-btn:hover {
+  background: rgba(239,68,68,0.1);
+  color: #fca5a5;
+}
+
+.tag-edit-flyout-section-label {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-soft);
+  padding: 2px 6px 0;
+}
+
+.tag-edit-flyout-color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding: 2px 2px 4px;
+}
+
+.tag-color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 5px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: transform 80ms ease, box-shadow 80ms ease;
+  position: relative;
+}
+.tag-color-swatch:hover {
+  transform: scale(1.12);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+.tag-color-swatch--active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid rgba(255,255,255,0.7);
+}
 
 /* ─── Docs mobile topbar + drawer ───────────────────────────────────────────── */
 

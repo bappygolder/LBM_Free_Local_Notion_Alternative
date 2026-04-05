@@ -29,6 +29,7 @@ window.MCCProjectData = {
         lane: "backlog",
         priority: "P2",
         area: "ui-ux",
+        effort: 4,
         source: "user-requested",
         recommendedBy: "",
         references: []
@@ -40,6 +41,7 @@ window.MCCProjectData = {
         lane: "backlog",
         priority: "P2",
         area: "product",
+        effort: 5,
         source: "recommended",
         recommendedBy: "Bappy Golder",
         references: []
@@ -51,6 +53,7 @@ window.MCCProjectData = {
         lane: "backlog",
         priority: "P3",
         area: "platform",
+        effort: 3,
         source: "recommended",
         recommendedBy: "Bappy Golder",
         references: []
@@ -62,6 +65,7 @@ window.MCCProjectData = {
         lane: "backlog",
         priority: "P2",
         area: "product",
+        effort: 7,
         source: "recommended",
         recommendedBy: "Bappy Golder",
         references: []
@@ -73,6 +77,7 @@ window.MCCProjectData = {
         lane: "backlog",
         priority: "P3",
         area: "ui-ux",
+        effort: 5,
         source: "recommended",
         recommendedBy: "Bappy Golder",
         references: []
@@ -84,6 +89,7 @@ window.MCCProjectData = {
         lane: "backlog",
         priority: "P3",
         area: "product",
+        effort: 8,
         source: "user-requested",
         recommendedBy: "Vision Roadmap",
         references: [
@@ -97,6 +103,7 @@ window.MCCProjectData = {
         lane: "backlog",
         priority: "P2",
         area: "product",
+        effort: 6,
         source: "user-requested",
         recommendedBy: "Vision Roadmap",
         references: [
@@ -106,12 +113,16 @@ window.MCCProjectData = {
       {
         id: "LBM-S001",
         title: "Remove legacy Mac Control Center task references from seed data",
-        notes: "Tasks MCC-004 through MCC-016 reference a macOS app (MacControlCenter) that is unrelated to LBM. These should be deleted from the seed data or replaced with LBM-relevant backlog items before public release.",
+        notes: "Tasks MCC-004 through MCC-016 reference a macOS app (MacControlCenter) that is unrelated to LBM. These should be deleted from the seed data or replaced with LBM-relevant backlog items before public release. Quick win — unblocks public GitHub release.",
         lane: "newly-added-or-updated",
         priority: "P1",
         area: "docs",
+        effort: 1,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "data/project-data.js"
         ]
@@ -123,8 +134,12 @@ window.MCCProjectData = {
         lane: "newly-added-or-updated",
         priority: "P1",
         area: "docs",
+        effort: 7,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "README.md",
           "docs/SETUP_GUIDE.md"
@@ -137,8 +152,12 @@ window.MCCProjectData = {
         lane: "newly-added-or-updated",
         priority: "P1",
         area: "release",
+        effort: 8,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: []
       },
       {
@@ -148,8 +167,12 @@ window.MCCProjectData = {
         lane: "newly-added-or-updated",
         priority: "P2",
         area: "docs",
+        effort: 2,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "README.md",
           "data/project-data.js"
@@ -162,8 +185,12 @@ window.MCCProjectData = {
         lane: "backlog",
         priority: "P2",
         area: "docs",
+        effort: 2,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "SKILL.md",
           "SKILL_ADD_SHORTCUT.md"
@@ -178,8 +205,12 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P1",
         area: "product",
+        effort: 3,
         source: "user-requested",
         recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "task-app.js",
           "SKILL_ADD_TASK.md"
@@ -194,8 +225,12 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P1",
         area: "docs",
+        effort: 2,
         source: "user-requested",
         recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "SKILL_ADD_TASK.md"
         ]
@@ -209,8 +244,12 @@ window.MCCProjectData = {
         value: 5000,
         priority: "P2",
         area: "docs",
+        effort: 2,
         source: "user-requested",
         recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "CLAUDE_INTEGRATION_GUIDE.md"
         ]
@@ -224,8 +263,12 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P1",
         area: "ui-ux",
+        effort: 8,
         source: "user-requested",
         recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "task-app.js",
           "index.html",
@@ -242,8 +285,12 @@ window.MCCProjectData = {
         value: 5000,
         priority: "P2",
         area: "docs",
+        effort: 2,
         source: "user-requested",
         recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/AI_TASK_CREATION.md"
         ]
@@ -257,8 +304,12 @@ window.MCCProjectData = {
         value: 5000,
         priority: "P2",
         area: "docs",
+        effort: 2,
         source: "user-requested",
         recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/VOICE_COMMANDS.md"
         ]
@@ -272,8 +323,12 @@ window.MCCProjectData = {
         value: 5000,
         priority: "P2",
         area: "project-system",
+        effort: 3,
         source: "user-requested",
         recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "data/docs-content.js",
           "data/project-data.js"
@@ -288,8 +343,12 @@ window.MCCProjectData = {
         value: 5000,
         priority: "P2",
         area: "docs",
+        effort: 1,
         source: "user-requested",
         recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "CLAUDE.md"
         ]
@@ -297,14 +356,18 @@ window.MCCProjectData = {
       {
         id: "LBM-R001",
         title: "Shortcut Management System — Phase 1: Registry + Settings UI",
-        notes: "Core differentiator. Central shortcut registry in localStorage, Settings UI panel to view/edit/reset any shortcut, live key combo recorder, and internal conflict detection. Full spec in docs/ROADMAP_SHORTCUTS.md. This is the single biggest planned feature for power-user acquisition.",
+        notes: "Central shortcut registry in localStorage, Settings UI panel to view/edit/reset any shortcut, live key combo recorder, and internal conflict detection. Full spec in docs/ROADMAP_SHORTCUTS.md. Not on the immediate revenue path — deprioritised until public launch milestones are hit.",
         lane: "backlog",
-        urgency: 4,
+        urgency: 2,
         value: 25000,
-        priority: "P1",
+        priority: "P3",
         area: "product",
+        effort: 9,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/ROADMAP_SHORTCUTS.md",
           "SKILL_ADD_SHORTCUT.md"
@@ -319,8 +382,12 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P2",
         area: "product",
+        effort: 4,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/ROADMAP_PRODUCT.md"
         ]
@@ -334,8 +401,12 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P1",
         area: "release",
+        effort: 2,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/INTERNAL_ROADMAP.md"
         ]
@@ -349,8 +420,12 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P2",
         area: "product",
+        effort: 2,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/INTERNAL_ROADMAP.md",
           "docs/ROADMAP_PRODUCT.md"
@@ -359,14 +434,18 @@ window.MCCProjectData = {
       {
         id: "LBM-R005",
         title: "Design and implement Supabase auth + task sync (Pro tier)",
-        notes: "Replace localStorage read/write with Supabase API calls. Add user_id and workspace_id to the task model. Use Supabase Auth for login/signup. The data shape is identical — only the persistence layer changes. Stage 1 of the Tier 2 backend plan.",
+        notes: "Replace localStorage read/write with Supabase API calls. Add user_id and workspace_id to the task model. Use Supabase Auth for login/signup. The data shape is identical — only the persistence layer changes. Stage 1 of the Tier 2 backend plan. IMPORTANT: Requires LBM-R006 product decisions to be locked first — do not start until persona, pricing, and branding are agreed.",
         lane: "backlog",
         urgency: 2,
         value: 25000,
         priority: "P2",
         area: "platform",
+        effort: 10,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/INTERNAL_ROADMAP.md"
         ]
@@ -374,14 +453,18 @@ window.MCCProjectData = {
       {
         id: "LBM-R006",
         title: "Resolve open product questions before Tier 2 build starts",
-        notes: "Four decisions must be locked before Pro development begins: (1) Paying user persona — solopreneur, small team, or agency? (2) Licence — MIT or AGPL for lbm-free? (3) Pricing model — subscription ($7–9/mo) or one-time ($49)? (4) Branding — keep 'LBM' or rename Pro to 'OBM'?",
+        notes: "Four decisions must be locked before Pro development begins: (1) Paying user persona — solopreneur, small team, or agency? (2) Licence — MIT or AGPL for lbm-free? (3) Pricing model — subscription ($7–9/mo) or one-time ($49)? (4) Branding — keep 'LBM' or rename Pro to 'OBM'? This unblocks LBM-R005.",
         lane: "backlog",
         urgency: 3,
         value: 5000,
         priority: "P2",
         area: "product",
+        effort: 3,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/INTERNAL_ROADMAP.md",
           "docs/ROADMAP_PRODUCT.md"
@@ -396,8 +479,12 @@ window.MCCProjectData = {
         value: 25000,
         priority: "P3",
         area: "platform",
+        effort: 10,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
+        tags: [
+          "added by Claude"
+        ],
         references: [
           "docs/INTERNAL_ROADMAP.md"
         ]
@@ -411,6 +498,7 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P1",
         area: "ui-ux",
+        effort: 4,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
         tags: [
@@ -429,6 +517,7 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P2",
         area: "product",
+        effort: 6,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
         tags: [
@@ -447,6 +536,7 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P2",
         area: "product",
+        effort: 6,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
         tags: [
@@ -457,12 +547,13 @@ window.MCCProjectData = {
       {
         id: "LBM-C004",
         title: "Remove legacy MCC seed tasks before public GitHub release",
-        notes: "Tasks MCC-001 through MCC-016 reference a macOS app (MacControlCenter) unrelated to LBM. Strip these from the seed data and replace with LBM-relevant examples. This must be done before the repo goes public or first-time visitors will be confused.",
+        notes: "Tasks MCC-001 through MCC-016 reference a macOS app (MacControlCenter) unrelated to LBM. Strip these from the seed data and replace with LBM-relevant examples. Quick win — unblocks the public release and cleans up the codebase fast. Must be done before the repo goes public.",
         lane: "newly-added-or-updated",
         urgency: 4,
         value: 5000,
         priority: "P1",
         area: "release",
+        effort: 1,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
         tags: [
@@ -482,12 +573,51 @@ window.MCCProjectData = {
         value: 10000,
         priority: "P3",
         area: "ui-ux",
+        effort: 8,
         source: "recommended",
         recommendedBy: "Claude Sonnet 4.6",
         tags: [
           "added by Claude"
         ],
         references: [
+          "styles.css"
+        ]
+      },
+      {
+        id: "LBM-C006",
+        title: "AI instruction chat section in list view",
+        notes: "Add a dedicated AI chat/instruction panel to the list view. Users can type natural-language commands to Claude to create, update, or move tasks without leaving the app. Future feature — design TBD. High value for power users and a key differentiator for the Pro tier.",
+        lane: "backlog",
+        urgency: 2,
+        value: 15000,
+        priority: "P2",
+        area: "ui-ux",
+        effort: 9,
+        source: "user-requested",
+        recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
+        references: []
+      },
+      {
+        id: "LBM-C007",
+        title: "Add 'effort' field (1–10) to task model and UI",
+        notes: "Add an effort property to the task data model (1–10 numeric, similar to urgency). Expose it in: normalizeTask() default, New Task modal select, inline list row editor, board card, detail panel, sort options, and markdown export. Effort represents implementation complexity; complements urgency (time pressure) and value (business impact).",
+        lane: "newly-added-or-updated",
+        urgency: 3,
+        value: 5000,
+        priority: "P2",
+        area: "product",
+        effort: 5,
+        source: "user-requested",
+        recommendedBy: "",
+        tags: [
+          "added by Claude"
+        ],
+        references: [
+          "task-app.js",
+          "index.html",
           "styles.css"
         ]
       }
@@ -549,10 +679,16 @@ window.MCCProjectData = {
       lastUpdated: "2026-03-28"
     },
     {
+      title: "Task Creation Guide",
+      summary: "How to write high-quality tasks — the 4-section description format (What/Why it matters/Why valuable/Why urgent), revenue-tier tagging, urgency scale, and all four methods for adding tasks.",
+      path: "docs/TASK_CREATION_GUIDE.md",
+      lastUpdated: "2026-04-05"
+    },
+    {
       title: "AI Task Creation",
-      summary: "How to add tasks via Claude Code or the browser console API. Trigger phrases, urgency/value/area inference, field reference, and example console commands.",
+      summary: "How to add tasks via Claude Code or the browser console API. Trigger phrases, urgency/value/area/tags inference, full field reference, and example console commands.",
       path: "docs/AI_TASK_CREATION.md",
-      lastUpdated: "2026-03-29"
+      lastUpdated: "2026-04-05"
     },
     {
       title: "Voice Commands",
