@@ -1,6 +1,6 @@
 {
   "_comment": "Source of truth for tracker.tasks in data/project-data.js. Edit here, then run: node scripts/sync-tasks.js",
-  "_syncedAt": "2026-04-06T07:54:54.764Z",
+  "_syncedAt": "2026-04-20T20:07:30.745Z",
   "tasks": [
     {
       "id": "LBM-003",
@@ -481,6 +481,38 @@
       "tags": ["dev", "ai"],
       "references": [],
       "description": "## What to do\nThis is a test task named Jack. No action required — created to verify task creation flow with urgency 5 and value $25,000.\n\n## Why it matters\nValidates that the file-based task creation pipeline works correctly end to end, including sync script and browser reload.\n\n## Why it's valuable\nConfirms the $25,000 revenue tier is selectable and displays correctly in the UI. Serves as a reference example for the maximum urgency and value combination.\n\n## Why it's urgent\nTest task — added at maximum urgency to verify urgency-5 rendering and priority logic. No real time pressure."
+    },
+    {
+      "id": "LBM-012",
+      "title": "Rotate Neon neondb_owner password for lbm-online",
+      "notes": "Connection string was pasted in an AI transcript. Reset the neondb_owner password in Neon console and update .env.local + Vercel env vars once scaffolded.",
+      "lane": "newly-added-or-updated",
+      "urgency": 5,
+      "value": 10000,
+      "area": "security",
+      "effort": 1,
+      "source": "user-requested",
+      "recommendedBy": "",
+      "addedBy": "claude-opus-4-7",
+      "tags": ["security", "platform", "ai"],
+      "references": ["1_LBM_Online/db/schema.sql"],
+      "description": "## What to do\n1. Open the Neon console → project `lbm-online` → Roles → `neondb_owner` → Reset password.\n2. Copy the new connection string from the Neon dashboard.\n3. Update `DATABASE_URL` in `1_LBM_Online/.env.local` once the Next.js scaffold exists (CTX-02+).\n4. If the project has already been deployed to Vercel (CTX-08+), update the `DATABASE_URL` env var in Vercel project Settings → Environment Variables → Production/Preview/Development, then trigger a redeploy.\n\n## Why it matters\nThe previous connection string (including password) was pasted in an AI chat transcript during the 2026-04-21 handover session. Transcripts may be logged, indexed, or persisted longer than intended. Any leaked DB credential is a direct path to read/write every task, workspace, and user record in the cloud DB.\n\n## Why it's valuable\nProtects the entire Phase 1 online build. A compromised neondb_owner can drop tables, exfiltrate user data, and destroy the product's credibility before a single paying customer signs up. This is the cheapest security win on the board — 90 seconds of console work avoids a compounding risk across every later phase.\n\n## Why it's urgent\nThe password is currently valid and in at least one chat log. Every hour it stays active is an hour a leaked transcript can be weaponised. Do this before the next work session."
+    },
+    {
+      "id": "LBM-013",
+      "title": "Verify 1_LBM_Online repo landed correctly on GitHub",
+      "notes": "Open https://github.com/bappygolder/lbm-online and confirm the 14-file initial commit is visible on the main branch.",
+      "lane": "newly-added-or-updated",
+      "urgency": 3,
+      "value": 5000,
+      "area": "release",
+      "effort": 1,
+      "source": "user-requested",
+      "recommendedBy": "",
+      "addedBy": "claude-opus-4-7",
+      "tags": ["release", "efficiency", "ai"],
+      "references": [],
+      "description": "## What to do\n1. Open https://github.com/bappygolder/lbm-online in a browser.\n2. Confirm the latest (initial) commit is `chore(bootstrap): initial schema + Phase 1 build prompts` on branch `main`.\n3. Confirm the file tree contains: `.gitignore`, `README.md`, `db/schema.sql`, and `prompts/build/` with `BUILD_INDEX.md` + `CTX-01` through `CTX-10` (12 files in that folder). Total should be 14 files.\n4. Spot-check that `README.md` renders cleanly on the GitHub landing page and that no `.env*` files are present in the tree.\n5. If anything is missing or a secret file is visible, report back immediately — the push may need to be redone or a file needs to be removed with `git rm --cached`.\n\n## Why it matters\nPhase 1 continuation depends on the repo being intact on GitHub. Every CTX-NN prompt starts with `git pull origin main`, so if the initial commit didn't reach origin, the first future session will silently start from a broken base.\n\n## Why it's valuable\nCatches a bad push while the context is still fresh (same day as the commit). A missing file discovered weeks later costs context re-derivation; discovered now it's a 30-second fix.\n\n## Why it's urgent\nLow urgency in isolation, but should be done before Bappy logs off today — any issue is trivially fixable while the push is still in working memory."
     },
     {
       "id": "LBM-C007",
